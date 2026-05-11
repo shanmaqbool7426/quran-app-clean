@@ -6,6 +6,7 @@ import { Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View, useColo
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import DailyAyahCard from "@/components/DailyAyahCard";
+import { AIScholarIcon, ListenIcon, QiblaIcon, QuranReadIcon } from "@/components/IslamicIcons";
 import PrayerTimesCard from "@/components/PrayerTimesCard";
 import StreakWidget from "@/components/StreakWidget";
 import { SURAHS } from "@/constants/quranData";
@@ -16,10 +17,10 @@ import { fetchInsight } from "@/services/aiService";
 import { DAILY_AYAHS } from "@/constants/quranData";
 
 const QUICK_ACTIONS = [
-  { icon: "cpu" as const, label: "AI Scholar", color: "#8B5CF6", route: "/ai-chat" },
-  { icon: "book-open" as const, label: "Read", color: "#0D5C3A", route: "/(tabs)/quran" },
-  { icon: "headphones" as const, label: "Listen", color: "#2563EB", route: "/(tabs)/quran" },
-  { icon: "navigation" as const, label: "Qibla", color: "#C8972A", route: "/qibla" },
+  { Icon: AIScholarIcon, label: "AI Scholar", color: "#8B5CF6", bgLight: "#F3EDFF", bgDark: "#1E1533", route: "/ai-chat" },
+  { Icon: QuranReadIcon, label: "Read", color: "#0D5C3A", bgLight: "#E8F5EE", bgDark: "#0D2018", route: "/(tabs)/quran" },
+  { Icon: ListenIcon, label: "Listen", color: "#2563EB", bgLight: "#EBF0FF", bgDark: "#0D1533", route: "/(tabs)/quran" },
+  { Icon: QiblaIcon, label: "Qibla", color: "#C8972A", bgLight: "#FDF3DC", bgDark: "#2A2010", route: "/qibla" },
 ];
 
 function getHijriDateString(hijriDate: string, hijriMonth: string, hijriYear: string): string {
@@ -107,19 +108,22 @@ export default function HomeScreen() {
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Quick Access</Text>
             <View style={styles.quickGrid}>
-              {QUICK_ACTIONS.map(action => (
-                <TouchableOpacity
-                  key={action.label}
-                  style={[styles.quickItem, { backgroundColor: colors.card, borderColor: colors.border }]}
-                  onPress={() => router.push(action.route as any)}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.quickIcon, { backgroundColor: action.color + "18" }]}>
-                    <Feather name={action.icon} size={22} color={action.color} />
-                  </View>
-                  <Text style={[styles.quickLabel, { color: colors.foreground }]}>{action.label}</Text>
-                </TouchableOpacity>
-              ))}
+              {QUICK_ACTIONS.map(action => {
+                const isDark = colors.background === "#0B1A2E";
+                return (
+                  <TouchableOpacity
+                    key={action.label}
+                    style={[styles.quickItem, { backgroundColor: colors.card, borderColor: colors.border }]}
+                    onPress={() => router.push(action.route as any)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={[styles.quickIcon, { backgroundColor: isDark ? action.bgDark : action.bgLight }]}>
+                      <action.Icon size={26} color={action.color} />
+                    </View>
+                    <Text style={[styles.quickLabel, { color: colors.foreground }]}>{action.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </View>
 
