@@ -2,11 +2,10 @@ import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
-import { Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View, useColorScheme } from "react-native";
+import { Image, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View, useColorScheme } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import DailyAyahCard from "@/components/DailyAyahCard";
-import { AIScholarIcon, ListenIcon, QiblaIcon, QuranReadIcon } from "@/components/IslamicIcons";
 import PrayerTimesCard from "@/components/PrayerTimesCard";
 import StreakWidget from "@/components/StreakWidget";
 import { SURAHS } from "@/constants/quranData";
@@ -15,12 +14,11 @@ import { useColors } from "@/hooks/useColors";
 import { useRealPrayerTimes } from "@/hooks/useRealPrayerTimes";
 import { fetchInsight } from "@/services/aiService";
 import { DAILY_AYAHS } from "@/constants/quranData";
-
 const QUICK_ACTIONS = [
-  { Icon: AIScholarIcon, label: "AI Scholar", color: "#8B5CF6", bgLight: "#F3EDFF", bgDark: "#1E1533", route: "/ai-chat" },
-  { Icon: QuranReadIcon, label: "Read", color: "#0D5C3A", bgLight: "#E8F5EE", bgDark: "#0D2018", route: "/(tabs)/quran" },
-  { Icon: ListenIcon, label: "Listen", color: "#2563EB", bgLight: "#EBF0FF", bgDark: "#0D1533", route: "/(tabs)/quran" },
-  { Icon: QiblaIcon, label: "Qibla", color: "#C8972A", bgLight: "#FDF3DC", bgDark: "#2A2010", route: "/qibla" },
+  { image: require("@/assets/images/tools/ai-scholar.png"), label: "AI Scholar", color: "#8B5CF6", bg: "#F3EDFF", route: "/ai-chat" },
+  { image: require("@/assets/images/tools/read.png"), label: "Read", color: "#0D5C3A", bg: "#E8F5EE", route: "/(tabs)/quran" },
+  { image: require("@/assets/images/tools/listen_icon.png"), label: "Listen", color: "#2563EB", bg: "#EBF0FF", route: "/(tabs)/quran" },
+  { image: require("@/assets/images/tools/qibla_icon.png"), label: "Qibla", color: "#C8972A", bg: "#FDF3DC", route: "/qibla" },
 ];
 
 function getHijriDateString(hijriDate: string, hijriMonth: string, hijriYear: string): string {
@@ -108,22 +106,23 @@ export default function HomeScreen() {
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Quick Access</Text>
             <View style={styles.quickGrid}>
-              {QUICK_ACTIONS.map(action => {
-                const isDark = colors.background === "#0B1A2E";
-                return (
-                  <TouchableOpacity
-                    key={action.label}
-                    style={[styles.quickItem, { backgroundColor: colors.card, borderColor: colors.border }]}
-                    onPress={() => router.push(action.route as any)}
-                    activeOpacity={0.7}
-                  >
-                    <View style={[styles.quickIcon, { backgroundColor: isDark ? action.bgDark : action.bgLight }]}>
-                      <action.Icon size={26} color={action.color} />
-                    </View>
-                    <Text style={[styles.quickLabel, { color: colors.foreground }]}>{action.label}</Text>
-                  </TouchableOpacity>
-                );
-              })}
+              {QUICK_ACTIONS.map(action => (
+                <TouchableOpacity
+                  key={action.label}
+                  style={[styles.quickItem, { backgroundColor: colors.card, borderColor: colors.border }]}
+                  onPress={() => router.push(action.route as any)}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.quickIcon, { overflow: "hidden", backgroundColor: action.bg }]}>
+                    <Image
+                      source={action.image}
+                      style={styles.quickImage}
+                      resizeMode="cover"
+                    />
+                  </View>
+                  <Text style={[styles.quickLabel, { color: colors.foreground }]}>{action.label}</Text>
+                </TouchableOpacity>
+              ))}
             </View>
           </View>
 
@@ -252,7 +251,8 @@ const styles = StyleSheet.create({
   seeAll: { fontSize: 13, fontFamily: "Inter_500Medium" },
   quickGrid: { flexDirection: "row", paddingHorizontal: 20, gap: 12 },
   quickItem: { flex: 1, alignItems: "center", gap: 8, padding: 14, borderRadius: 16, borderWidth: 1 },
-  quickIcon: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
+  quickIcon: { width: 54, height: 54, borderRadius: 18, alignItems: "center", justifyContent: "center" },
+  quickImage: { width: 54, height: 54, borderRadius: 18 },
   quickLabel: { fontSize: 12, fontFamily: "Inter_500Medium" },
   insightCard: { marginHorizontal: 20, padding: 16, borderRadius: 14, borderWidth: 1 },
   insightHeader: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 8 },

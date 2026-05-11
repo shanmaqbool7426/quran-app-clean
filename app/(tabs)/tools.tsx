@@ -1,95 +1,86 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React from "react";
-import { Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Image, ImageSourcePropType, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import {
-  AIScholarIcon,
-  DuasIcon,
-  HadithIcon,
-  HifzIcon,
-  MosqueIcon,
-  QiblaIcon,
-  TasbeehIcon,
-  ZakatIcon,
-} from "@/components/IslamicIcons";
+import { ZakatIcon } from "@/components/IslamicIcons";
 import PrayerTimesCard from "@/components/PrayerTimesCard";
 import { useColors } from "@/hooks/useColors";
 import { useRealPrayerTimes } from "@/hooks/useRealPrayerTimes";
 
-const TOOLS = [
+const TOOLS: Array<{
+  image?: ImageSourcePropType;
+  useSvg?: boolean;
+  label: string;
+  subtitle: string;
+  color: string;
+  accent: string;
+  route: string;
+}> = [
   {
-    Icon: QiblaIcon,
+    image: require("@/assets/images/tools/qibla_icon.png"),
     label: "Qibla",
     subtitle: "Find direction",
     color: "#C8972A",
+    accent: "#FDF3DC",
     route: "/qibla",
-    bgLight: ["#FDF3DC", "#FBE8B0"] as [string, string],
-    bgDark: ["#2A2010", "#1E1808"] as [string, string],
   },
   {
-    Icon: TasbeehIcon,
+    image: require("@/assets/images/tools/tasbeeh.png"),
     label: "Tasbeeh",
     subtitle: "Digital counter",
     color: "#8B5CF6",
+    accent: "#F3EDFF",
     route: "/tasbeeh",
-    bgLight: ["#F3EDFF", "#E8DCFF"] as [string, string],
-    bgDark: ["#1E1533", "#170F28"] as [string, string],
   },
   {
-    Icon: DuasIcon,
+    image: require("@/assets/images/tools/duas_icon.png"),
     label: "Duas",
     subtitle: "Collection",
     color: "#0D5C3A",
+    accent: "#E8F5EE",
     route: "/duas",
-    bgLight: ["#E8F5EE", "#CDE9DA"] as [string, string],
-    bgDark: ["#0D2018", "#091510"] as [string, string],
   },
   {
-    Icon: HadithIcon,
+    image: require("@/assets/images/tools/hadith.png"),
     label: "Hadith",
     subtitle: "6 major collections",
     color: "#2563EB",
+    accent: "#EBF0FF",
     route: "/hadith",
-    bgLight: ["#EBF0FF", "#D5E2FF"] as [string, string],
-    bgDark: ["#0D1533", "#090F28"] as [string, string],
   },
   {
-    Icon: ZakatIcon,
+    useSvg: true,
     label: "Zakat",
     subtitle: "Calculator",
     color: "#D97706",
+    accent: "#FEF3E2",
     route: "/zakat",
-    bgLight: ["#FEF3E2", "#FDE6C0"] as [string, string],
-    bgDark: ["#261808", "#1A1005"] as [string, string],
   },
   {
-    Icon: MosqueIcon,
+    image: require("@/assets/images/tools/mosque.png"),
     label: "Mosque",
     subtitle: "Finder",
     color: "#DC2626",
+    accent: "#FEE9E9",
     route: "/mosque",
-    bgLight: ["#FEE9E9", "#FDD5D5"] as [string, string],
-    bgDark: ["#280A0A", "#1A0505"] as [string, string],
   },
   {
-    Icon: AIScholarIcon,
+    image: require("@/assets/images/tools/ai-scholar.png"),
     label: "AI Scholar",
     subtitle: "Islamic Q&A",
     color: "#8B5CF6",
+    accent: "#F3EDFF",
     route: "/ai-chat",
-    bgLight: ["#F3EDFF", "#E8DCFF"] as [string, string],
-    bgDark: ["#1E1533", "#170F28"] as [string, string],
   },
   {
-    Icon: HifzIcon,
+    image: require("@/assets/images/tools/ai-scholar2.png"),
     label: "Hifz Plan",
     subtitle: "Memorize Quran",
     color: "#22C55E",
+    accent: "#E9FBF0",
     route: "/memorize",
-    bgLight: ["#E9FBF0", "#CDF5DC"] as [string, string],
-    bgDark: ["#0A2014", "#061509"] as [string, string],
   },
 ];
 
@@ -97,7 +88,6 @@ export default function ToolsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
-  const isDark = colors.background === "#0B1A2E";
   const { hijriDate, hijriMonth, hijriYear, gregorianDate } = useRealPrayerTimes();
 
   const displayDate = hijriDate && hijriMonth
@@ -122,7 +112,6 @@ export default function ToolsScreen() {
         >
           <Text style={styles.headerTitle}>Islamic Tools</Text>
           <Text style={styles.headerSub}>Your spiritual companion</Text>
-
           <View style={[styles.dateBanner, { backgroundColor: "rgba(255,255,255,0.15)" }]}>
             <View>
               <Text style={styles.dateLabel}>Hijri Date</Text>
@@ -149,27 +138,46 @@ export default function ToolsScreen() {
                   key={tool.label}
                   style={[styles.toolCard, { backgroundColor: colors.card, borderColor: colors.border }]}
                   onPress={() => router.push(tool.route as any)}
-                  activeOpacity={0.75}
+                  activeOpacity={0.8}
                 >
-                  <LinearGradient
-                    colors={isDark ? tool.bgDark : tool.bgLight}
-                    style={styles.toolIconBg}
-                  >
-                    <tool.Icon size={34} color={tool.color} />
-                  </LinearGradient>
-                  <Text style={[styles.toolLabel, { color: colors.foreground }]}>{tool.label}</Text>
-                  <Text style={[styles.toolSub, { color: colors.mutedForeground }]}>{tool.subtitle}</Text>
+                  {tool.useSvg ? (
+                    <View style={[styles.toolIconWrap, { backgroundColor: tool.accent }]}>
+                      <ZakatIcon size={40} color={tool.color} />
+                    </View>
+                  ) : (
+                    <View style={[styles.toolIconWrap, { backgroundColor: tool.accent, overflow: "hidden" }]}>
+                      <Image
+                        source={tool.image!}
+                        style={styles.toolImage}
+                        resizeMode="cover"
+                      />
+                      <View style={[styles.toolImageOverlay, { borderColor: tool.color + "30" }]} />
+                    </View>
+                  )}
+                  <View style={styles.toolMeta}>
+                    <Text style={[styles.toolLabel, { color: colors.foreground }]}>{tool.label}</Text>
+                    <Text style={[styles.toolSub, { color: colors.mutedForeground }]}>{tool.subtitle}</Text>
+                  </View>
+                  <View style={[styles.toolArrow, { backgroundColor: tool.color + "15" }]}>
+                    <Text style={[styles.toolArrowText, { color: tool.color }]}>›</Text>
+                  </View>
                 </TouchableOpacity>
               ))}
             </View>
           </View>
 
           <TouchableOpacity onPress={() => router.push("/ai-chat" as any)} activeOpacity={0.88}>
-            <LinearGradient
-              colors={["#1A0533", "#3B0764"]}
-              style={styles.aiCard}
-            >
-              <View style={styles.aiLeft}>
+            <View style={styles.aiCardWrap}>
+              <Image
+                source={require("@/assets/images/tools/ai-scholar.png")}
+                style={styles.aiCardBg}
+                resizeMode="cover"
+              />
+              <LinearGradient
+                colors={["rgba(15,5,40,0.75)", "rgba(58,7,100,0.92)"]}
+                style={StyleSheet.absoluteFill}
+              />
+              <View style={styles.aiContent}>
                 <View style={styles.aiBadge}>
                   <Text style={styles.aiBadgeText}>✦ AI POWERED</Text>
                 </View>
@@ -179,10 +187,7 @@ export default function ToolsScreen() {
                   <Text style={styles.aiBtnText}>Start Conversation →</Text>
                 </View>
               </View>
-              <View style={styles.aiIconWrap}>
-                <AIScholarIcon size={44} color="#C4B5FD" />
-              </View>
-            </LinearGradient>
+            </View>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -204,30 +209,56 @@ const styles = StyleSheet.create({
   content: { padding: 20, gap: 24 },
   section: { gap: 12 },
   sectionTitle: { fontSize: 17, fontFamily: "Inter_700Bold" },
-  toolGrid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
+  toolGrid: { gap: 10 },
   toolCard: {
-    width: "47%",
+    flexDirection: "row",
     alignItems: "center",
-    padding: 18,
-    borderRadius: 20,
+    gap: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 18,
     borderWidth: 1,
-    gap: 10,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
     shadowRadius: 8,
     elevation: 2,
   },
-  toolIconBg: { width: 68, height: 68, borderRadius: 20, alignItems: "center", justifyContent: "center" },
-  toolLabel: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
-  toolSub: { fontSize: 11, fontFamily: "Inter_400Regular", textAlign: "center" },
-  aiCard: { padding: 22, flexDirection: "row", alignItems: "center", gap: 16, borderRadius: 20 },
-  aiLeft: { flex: 1, gap: 10 },
+  toolIconWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  toolImage: {
+    width: 72,
+    height: 72,
+    borderRadius: 18,
+  },
+  toolImageOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  toolMeta: { flex: 1, gap: 3 },
+  toolLabel: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  toolSub: { fontSize: 12, fontFamily: "Inter_400Regular" },
+  toolArrow: { width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center" },
+  toolArrowText: { fontSize: 20, fontFamily: "Inter_600SemiBold", marginTop: -2 },
+  aiCardWrap: { height: 160, borderRadius: 22, overflow: "hidden", justifyContent: "flex-end" },
+  aiCardBg: { ...StyleSheet.absoluteFillObject, width: "100%", height: "100%" },
+  aiContent: { padding: 20, gap: 8 },
   aiBadge: { backgroundColor: "#8B5CF6", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, alignSelf: "flex-start" },
   aiBadgeText: { fontSize: 10, fontFamily: "Inter_700Bold", color: "#FFFFFF", letterSpacing: 1 },
   aiTitle: { color: "#FFFFFF", fontSize: 19, fontFamily: "Inter_700Bold" },
-  aiSub: { color: "rgba(255,255,255,0.8)", fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 20 },
-  aiBtn: { backgroundColor: "#FFFFFF", paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, alignSelf: "flex-start" },
+  aiSub: { color: "rgba(255,255,255,0.85)", fontSize: 12, fontFamily: "Inter_400Regular" },
+  aiBtn: { backgroundColor: "rgba(255,255,255,0.95)", paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, alignSelf: "flex-start" },
   aiBtnText: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#8B5CF6" },
-  aiIconWrap: { width: 80, height: 80, borderRadius: 40, backgroundColor: "rgba(139,92,246,0.2)", alignItems: "center", justifyContent: "center" },
 });
