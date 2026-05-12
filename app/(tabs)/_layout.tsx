@@ -4,15 +4,20 @@ import { Tabs } from "expo-router";
 import { SymbolView } from "expo-symbols";
 import React from "react";
 import { Platform, StyleSheet, View, useColorScheme } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
 
 export default function TabLayout() {
   const colors = useColors();
+  const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const isIOS = Platform.OS === "ios";
   const isWeb = Platform.OS === "web";
+
+  const tabBarHeight = isWeb ? 70 : 58;
+  const bottomPad = Math.max(isWeb ? 20 : insets.bottom - 8, 6);
 
   return (
     <Tabs
@@ -23,26 +28,34 @@ export default function TabLayout() {
         tabBarStyle: {
           position: "absolute",
           backgroundColor: isIOS ? "transparent" : colors.card,
-          borderTopWidth: 1,
-          borderTopColor: colors.border,
+          borderTopWidth: 0,
           elevation: 0,
-          height: isWeb ? 84 : 62,
-          paddingBottom: isWeb ? 34 : 6,
+          height: tabBarHeight + bottomPad,
+          paddingBottom: bottomPad,
+          paddingTop: 6,
+          ...(!isIOS && {
+            borderTopColor: colors.border,
+            borderTopWidth: StyleSheet.hairlineWidth,
+          }),
         },
         tabBarLabelStyle: {
           fontSize: 10,
           fontFamily: "Inter_500Medium",
+          marginTop: 2,
         },
         tabBarBackground: () =>
           isIOS ? (
             <BlurView
-              intensity={100}
+              intensity={90}
               tint={isDark ? "dark" : "light"}
               style={StyleSheet.absoluteFill}
             />
           ) : (
             <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.card }]} />
           ),
+        tabBarItemStyle: {
+          gap: 1,
+        },
       }}
     >
       <Tabs.Screen
@@ -51,9 +64,9 @@ export default function TabLayout() {
           title: "Home",
           tabBarIcon: ({ color }) =>
             isIOS ? (
-              <SymbolView name="house.fill" tintColor={color} size={22} />
+              <SymbolView name="house.fill" tintColor={color} size={20} />
             ) : (
-              <Feather name="home" size={22} color={color} />
+              <Feather name="home" size={20} color={color} />
             ),
         }}
       />
@@ -63,9 +76,9 @@ export default function TabLayout() {
           title: "Quran",
           tabBarIcon: ({ color }) =>
             isIOS ? (
-              <SymbolView name="book.fill" tintColor={color} size={22} />
+              <SymbolView name="book.fill" tintColor={color} size={20} />
             ) : (
-              <Feather name="book-open" size={22} color={color} />
+              <Feather name="book-open" size={20} color={color} />
             ),
         }}
       />
@@ -75,9 +88,9 @@ export default function TabLayout() {
           title: "Learn",
           tabBarIcon: ({ color }) =>
             isIOS ? (
-              <SymbolView name="graduationcap.fill" tintColor={color} size={22} />
+              <SymbolView name="graduationcap.fill" tintColor={color} size={20} />
             ) : (
-              <Feather name="mic" size={22} color={color} />
+              <Feather name="mic" size={20} color={color} />
             ),
         }}
       />
@@ -87,9 +100,9 @@ export default function TabLayout() {
           title: "Tools",
           tabBarIcon: ({ color }) =>
             isIOS ? (
-              <SymbolView name="moon.stars.fill" tintColor={color} size={22} />
+              <SymbolView name="moon.stars.fill" tintColor={color} size={20} />
             ) : (
-              <Feather name="moon" size={22} color={color} />
+              <Feather name="moon" size={20} color={color} />
             ),
         }}
       />
@@ -99,9 +112,9 @@ export default function TabLayout() {
           title: "Profile",
           tabBarIcon: ({ color }) =>
             isIOS ? (
-              <SymbolView name="person.fill" tintColor={color} size={22} />
+              <SymbolView name="person.fill" tintColor={color} size={20} />
             ) : (
-              <Feather name="user" size={22} color={color} />
+              <Feather name="user" size={20} color={color} />
             ),
         }}
       />

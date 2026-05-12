@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import * as Haptics from "expo-haptics";
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useCallback } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -12,6 +12,8 @@ import {
   Text,
   TouchableOpacity,
   View,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -46,12 +48,12 @@ export default function SurahScreen() {
   const [audioDuration, setAudioDuration] = useState(0);
   const [langModalVisible, setLangModalVisible] = useState(false);
   const [fontModalVisible, setFontModalVisible] = useState(false);
-  const scrollRef = useRef<ScrollView>(null);
+  const listRef = useRef<FlatList>(null);
 
   const currentTranslation =
     TRANSLATION_OPTIONS.find((t) => t.id === translationLang) ?? TRANSLATION_OPTIONS[0]!;
 
-  const { data, isLoading, isError } = useQuranSurah(
+  const { data, isLoading, isError, refetch } = useQuranSurah(
     surahId,
     reciter.edition,
     translationLang
@@ -65,6 +67,20 @@ export default function SurahScreen() {
     ) ?? [];
 
   const ayahNumbers = data?.arabicAyahs.map((a) => a.numberInSurah) ?? [];
+
+  const handleScroll = useCallback(({ nativeEvent }: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (!data) return;
+    const progress =
+      nativeEvent.contentOffset.y /
+      Math.max(
+        1,
+        nativeEvent.contentSize.height - nativeEvent.layoutMeasurement.height
+      );
+    const ayahIndex = Math.floor(
+      progress * (data.arabicAyahs.length - 1)
+    );
+    setLastRead(surahId, ayahNumbers[ayahIndex] ?? ayahIndex + 1);
+  }, [data, ayahNumbers, surahId, setLastRead]);
 
   const surahDescription =
     data?.surah.revelationType === "Meccan"
@@ -86,25 +102,30 @@ export default function SurahScreen() {
       >
         {/* Title row */}
         <View style={styles.headerTop}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-            <Feather name="chevron-left" size={24} color={colors.foreground} />
+          <TouchableOpacity onPress={() => router.back()} style={[styles.backBtn, { backgroundColor: colors.muted }]}>
+            <Feather name="chevron-left" size={22} color={colors.foreground} />
           </TouchableOpacity>
           <View style={styles.headerInfo}>
             <Text style={[styles.surahName, { color: colors.foreground }]}>
               {data?.surah.englishName ?? `Surah ${surahId}`}
             </Text>
-            <Text style={[styles.surahMeta, { color: colors.mutedForeground }]}>
-              {data
-                ? `${data.surah.numberOfAyahs} Ayahs • ${surahDescription}`
-                : "Loading..."}
-            </Text>
+            {data ? (
+              <Text style={[styles.surahMeta, { color: colors.mutedForeground }]}>
+                {data.surah.numberOfAyahs} Ayahs · {surahDescription}
+              </Text>
+            ) : (
+              <View style={{ flexDirection: "row", gap: 6, marginTop: 2 }}>
+                <View style={{ width: 60, height: 12, borderRadius: 4, backgroundColor: colors.border }} />
+                <View style={{ width: 80, height: 12, borderRadius: 4, backgroundColor: colors.border }} />
+              </View>
+            )}
           </View>
           <Text style={[styles.arabicName, { color: colors.primary }]}>
             {data?.surah.name ?? ""}
           </Text>
         </View>
 
-        {/* Controls row 1: display toggles */}
+        {/* Controls row: display toggles */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -127,7 +148,7 @@ export default function SurahScreen() {
             label="Word-by-Word"
             active={showWordByWord}
             onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); } catch {}
               setShowWordByWord((p) => !p);
             }}
             colors={colors}
@@ -143,7 +164,7 @@ export default function SurahScreen() {
               },
             ]}
             onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); } catch {}
               if (hifzMode) {
                 setHifzMode(false);
               } else {
@@ -234,144 +255,174 @@ export default function SurahScreen() {
         <View style={styles.loadingState}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={[styles.loadingText, { color: colors.mutedForeground }]}>
-            Loading Quran data...
+            Loading surah...
           </Text>
         </View>
       )}
 
       {isError && (
         <View style={styles.loadingState}>
-          <Feather name="wifi-off" size={32} color={colors.mutedForeground} />
-          <Text style={[styles.loadingText, { color: colors.mutedForeground }]}>
-            Could not load surah. Check your connection.
+          <View style={[styles.errorIconBox, { backgroundColor: colors.destructive + "15" }]}>
+            <Feather name="wifi-off" size={24} color={colors.destructive} />
+          </View>
+          <Text style={[styles.loadingText, { color: colors.foreground, fontFamily: "Inter_600SemiBold" }]}>
+            Could not load surah
           </Text>
+          <Text style={[styles.loadingText, { color: colors.mutedForeground }]}>
+            Check your connection and try again.
+          </Text>
+          <TouchableOpacity
+            style={[styles.retryBtn, { backgroundColor: colors.primary }]}
+            onPress={() => refetch()}
+          >
+            <Feather name="refresh-cw" size={14} color="#FFFFFF" />
+            <Text style={styles.retryBtnText}>Retry</Text>
+          </TouchableOpacity>
         </View>
       )}
 
-      {/* ── Ayah list ── */}
-      <ScrollView
-        ref={scrollRef}
-        contentContainerStyle={{
-          paddingTop: 8,
-          paddingBottom: Platform.OS === "web" ? 120 : insets.bottom + 100,
-        }}
-        showsVerticalScrollIndicator={false}
-        onScroll={({ nativeEvent }) => {
-          if (!data) return;
-          const progress =
-            nativeEvent.contentOffset.y /
-            Math.max(
-              1,
-              nativeEvent.contentSize.height - nativeEvent.layoutMeasurement.height
-            );
-          const ayahIndex = Math.floor(
-            progress * (data.arabicAyahs.length - 1)
-          );
-          setLastRead(surahId, ayahNumbers[ayahIndex] ?? ayahIndex + 1);
-        }}
-        scrollEventThrottle={400}
-      >
-        {/* Bismillah */}
-        {surahId !== 9 && surahId !== 1 && data && (
-          <View style={styles.bismillah}>
-            <Text style={[styles.bismillahText, { color: colors.primary }]}>
-              بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
-            </Text>
-            <Text style={[styles.bismillahTrans, { color: colors.mutedForeground }]}>
-              In the name of Allah, the Most Gracious, the Most Merciful
-            </Text>
-          </View>
-        )}
-
-        {/* Surah info banner */}
-        {data?.surah && (
-          <View
-            style={[
-              styles.surahInfoBanner,
-              { backgroundColor: colors.secondary, borderColor: colors.border },
-            ]}
-          >
-            {[
-              { label: "No.", value: String(surahId) },
-              { label: "Ayahs", value: String(data.surah.numberOfAyahs) },
-              { label: "Origin", value: data.surah.revelationType },
-              { label: "Meaning", value: data.surah.englishNameTranslation },
-            ].map((item, i, arr) => (
-              <React.Fragment key={item.label}>
-                <View style={styles.surahInfoItem}>
-                  <Text style={[styles.surahInfoLabel, { color: colors.mutedForeground }]}>
-                    {item.label}
+      {/* ── Ayah list (FlatList for smooth performance) ── */}
+      {data && (
+        <FlatList
+          ref={listRef}
+          data={data.arabicAyahs}
+          keyExtractor={(item) => String(item.numberInSurah)}
+          initialNumToRender={8}
+          maxToRenderPerBatch={8}
+          windowSize={7}
+          removeClippedSubviews={Platform.OS !== "web"}
+          contentContainerStyle={{
+            paddingTop: 8,
+            paddingBottom: Platform.OS === "web" ? 120 : insets.bottom + 100,
+          }}
+          showsVerticalScrollIndicator={false}
+          onScroll={handleScroll}
+          scrollEventThrottle={400}
+          ListHeaderComponent={
+            <>
+              {/* Bismillah */}
+              {surahId !== 9 && surahId !== 1 && (
+                <View style={styles.bismillah}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 12, width: "60%" }}>
+                    <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+                    <Feather name="star" size={10} color={colors.primary} />
+                    <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+                  </View>
+                  <Text style={[styles.bismillahText, { color: colors.foreground }]}>
+                    بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ
                   </Text>
-                  <Text
-                    style={[styles.surahInfoValue, { color: colors.primary }]}
-                    numberOfLines={1}
-                  >
-                    {item.value}
+                  <Text style={[styles.bismillahTrans, { color: colors.mutedForeground }]}>
+                    In the name of Allah, the Most Gracious, the Most Merciful
+                  </Text>
+                  <View style={{ width: "40%", height: 1, backgroundColor: colors.border }} />
+                </View>
+              )}
+
+              {/* Surah info banner */}
+              {data?.surah && (
+                <View
+                  style={[
+                    styles.surahInfoBanner,
+                    { backgroundColor: colors.card, borderColor: colors.border },
+                  ]}
+                >
+                  <View style={styles.surahInfoItem}>
+                    <Feather name="hash" size={13} color={colors.primary} />
+                    <Text style={[styles.surahInfoValue, { color: colors.foreground }]}>
+                      {surahId}
+                    </Text>
+                    <Text style={[styles.surahInfoLabel, { color: colors.mutedForeground }]}>
+                      Surah
+                    </Text>
+                  </View>
+                  <View style={[styles.surahInfoDiv, { backgroundColor: colors.border }]} />
+                  <View style={styles.surahInfoItem}>
+                    <Feather name="book-open" size={13} color={colors.primary} />
+                    <Text style={[styles.surahInfoValue, { color: colors.foreground }]}>
+                      {data.surah.numberOfAyahs}
+                    </Text>
+                    <Text style={[styles.surahInfoLabel, { color: colors.mutedForeground }]}>
+                      Ayahs
+                    </Text>
+                  </View>
+                  <View style={[styles.surahInfoDiv, { backgroundColor: colors.border }]} />
+                  <View style={styles.surahInfoItem}>
+                    <Feather name={data.surah.revelationType === "Meccan" ? "sunrise" : "moon"} size={13} color={colors.primary} />
+                    <Text style={[styles.surahInfoValue, { color: colors.foreground }]} numberOfLines={1}>
+                      {data.surah.revelationType}
+                    </Text>
+                    <Text style={[styles.surahInfoLabel, { color: colors.mutedForeground }]}>
+                      Origin
+                    </Text>
+                  </View>
+                  <View style={[styles.surahInfoDiv, { backgroundColor: colors.border }]} />
+                  <View style={styles.surahInfoItem}>
+                    <Feather name="globe" size={13} color={colors.primary} />
+                    <Text style={[styles.surahInfoValue, { color: colors.foreground }]} numberOfLines={1}>
+                      {data.surah.englishNameTranslation}
+                    </Text>
+                    <Text style={[styles.surahInfoLabel, { color: colors.mutedForeground }]}>
+                      Meaning
+                    </Text>
+                  </View>
+                </View>
+              )}
+
+              {/* Word-by-word intro card when mode is active */}
+              {showWordByWord && (
+                <View
+                  style={[
+                    styles.wbwIntro,
+                    { backgroundColor: colors.primary + "10", borderColor: colors.primary + "25" },
+                  ]}
+                >
+                  <Feather name="info" size={14} color={colors.primary} />
+                  <Text style={[styles.wbwIntroText, { color: colors.primary }]}>
+                    Each Arabic word is shown with its transliteration and English meaning. Words flow right-to-left as in the original text.
                   </Text>
                 </View>
-                {i < arr.length - 1 && (
-                  <View style={[styles.surahInfoDiv, { backgroundColor: colors.border }]} />
-                )}
-              </React.Fragment>
-            ))}
-          </View>
-        )}
+              )}
+            </>
+          }
+          renderItem={({ item: arabicAyah, index: idx }) => {
+            const translationAyah = data.translationAyahs[idx];
+            const audioAyah = data.audioAyahs[idx];
+            const audioUrl =
+              audioAyah?.audio ??
+              `${AUDIO_CDN}/${reciter.edition}/${arabicAyah.number}.mp3`;
 
-        {/* Word-by-word intro card when mode is active */}
-        {showWordByWord && data && (
-          <View
-            style={[
-              styles.wbwIntro,
-              { backgroundColor: colors.primary + "10", borderColor: colors.primary + "25" },
-            ]}
-          >
-            <Feather name="info" size={14} color={colors.primary} />
-            <Text style={[styles.wbwIntroText, { color: colors.primary }]}>
-              Each Arabic word is shown with its transliteration and English meaning. Words flow right-to-left as in the original text.
-            </Text>
-          </View>
-        )}
-
-        {/* Ayah cards */}
-        {data?.arabicAyahs.map((arabicAyah, idx) => {
-          const translationAyah = data.translationAyahs[idx];
-          const audioAyah = data.audioAyahs[idx];
-          const audioUrl =
-            audioAyah?.audio ??
-            `${AUDIO_CDN}/${reciter.edition}/${arabicAyah.number}.mp3`;
-
-          return (
-            <AyahCard
-              key={arabicAyah.numberInSurah}
-              ayah={{
-                number: arabicAyah.numberInSurah,
-                arabic: arabicAyah.text,
-                translation: translationAyah?.text ?? "",
-                audioUrl,
-                globalNumber: arabicAyah.number,
-              }}
-              surahId={surahId}
-              surahName={data.surah.englishName}
-              showTranslation={showTranslation}
-              showTransliteration={showTranslit}
-              showWordByWord={showWordByWord}
-              hifzMode={hifzMode}
-              hifzDifficulty={hifzDifficulty}
-              isPlaying={playingIdx === idx}
-              fontSize={fontSize}
-              playbackProgress={
-                playingIdx === idx && audioDuration > 0
-                  ? audioPosition / audioDuration
-                  : 0
-              }
-              onPlayPress={() => {
-                setCurrentAyahIdx(idx);
-                setPlayingIdx(playingIdx === idx ? null : idx);
-              }}
-            />
-          );
-        })}
-      </ScrollView>
+            return (
+              <AyahCard
+                ayah={{
+                  number: arabicAyah.numberInSurah,
+                  arabic: arabicAyah.text,
+                  translation: translationAyah?.text ?? "",
+                  audioUrl,
+                  globalNumber: arabicAyah.number,
+                }}
+                surahId={surahId}
+                surahName={data.surah.englishName}
+                showTranslation={showTranslation}
+                showTransliteration={showTranslit}
+                showWordByWord={showWordByWord}
+                hifzMode={hifzMode}
+                hifzDifficulty={hifzDifficulty}
+                isPlaying={playingIdx === idx}
+                fontSize={fontSize}
+                playbackProgress={
+                  playingIdx === idx && audioDuration > 0
+                    ? audioPosition / audioDuration
+                    : 0
+                }
+                onPlayPress={() => {
+                  setCurrentAyahIdx(idx);
+                  setPlayingIdx(playingIdx === idx ? null : idx);
+                }}
+              />
+            );
+          }}
+        />
+      )}
 
       {/* ── Language modal ── */}
       <Modal
@@ -645,11 +696,11 @@ const styles = StyleSheet.create({
     gap: 12,
     marginBottom: 12,
   },
-  backBtn: { padding: 4 },
+  backBtn: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
   headerInfo: { flex: 1 },
   surahName: { fontSize: 17, fontFamily: "Inter_700Bold" },
   surahMeta: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2 },
-  arabicName: { fontSize: 22, fontWeight: "400" },
+  arabicName: { fontSize: 24, fontWeight: "500" },
   controlsRow: { flexDirection: "row", gap: 8, paddingBottom: 10 },
   controlBtn: {
     paddingHorizontal: 12,
@@ -673,7 +724,7 @@ const styles = StyleSheet.create({
   loadingState: {
     alignItems: "center",
     justifyContent: "center",
-    padding: 40,
+    padding: 60,
     gap: 12,
   },
   loadingText: {
@@ -681,8 +732,26 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     textAlign: "center",
   },
-  bismillah: { alignItems: "center", paddingVertical: 20, gap: 6 },
-  bismillahText: { fontSize: 26, fontWeight: "400", lineHeight: 44 },
+  errorIconBox: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 4,
+  },
+  retryBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+    marginTop: 8,
+  },
+  retryBtnText: { color: "#FFFFFF", fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  bismillah: { alignItems: "center", paddingVertical: 24, gap: 8 },
+  bismillahText: { fontSize: 28, fontWeight: "500", lineHeight: 48 },
   bismillahTrans: {
     fontSize: 12,
     fontFamily: "Inter_400Regular",
@@ -692,19 +761,24 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     marginHorizontal: 20,
     marginBottom: 8,
-    padding: 14,
+    padding: 12,
     borderRadius: 14,
     borderWidth: 1,
+    shadowColor: "#000",
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
   },
-  surahInfoItem: { flex: 1, alignItems: "center", gap: 4 },
+  surahInfoItem: { flex: 1, alignItems: "center", gap: 3 },
   surahInfoLabel: {
-    fontSize: 10,
+    fontSize: 9,
     fontFamily: "Inter_500Medium",
     textTransform: "uppercase",
     letterSpacing: 0.5,
   },
   surahInfoValue: { fontSize: 12, fontFamily: "Inter_700Bold" },
-  surahInfoDiv: { width: 1, marginVertical: 4 },
+  surahInfoDiv: { width: 1, marginVertical: 6 },
   wbwIntro: {
     flexDirection: "row",
     alignItems: "flex-start",

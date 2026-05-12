@@ -176,7 +176,6 @@ export default function HadithScreen() {
         contentContainerStyle={{
           padding: 16,
           paddingBottom: Platform.OS === "web" ? 34 : insets.bottom + 20,
-          gap: 12,
         }}
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
@@ -289,7 +288,7 @@ const styles = StyleSheet.create({
   statNum: { color: "#FFFFFF", fontSize: 16, fontFamily: "Inter_700Bold" },
   statLbl: { color: "rgba(255,255,255,0.8)", fontSize: 10, fontFamily: "Inter_400Regular" },
   statDivider: { width: 1, backgroundColor: "rgba(255,255,255,0.2)", marginVertical: 4 },
-  hadithCard: { borderRadius: 16, borderWidth: 1, padding: 16, gap: 12 },
+  hadithCard: { borderRadius: 16, borderWidth: 1, padding: 16, gap: 12, marginBottom: 12 },
   hadithHeader: { flexDirection: "row", alignItems: "center", gap: 12 },
   hadithNum: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center" },
   hadithNumText: { color: "#FFFFFF", fontSize: 12, fontFamily: "Inter_700Bold" },

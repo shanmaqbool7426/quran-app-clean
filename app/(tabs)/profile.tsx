@@ -7,17 +7,24 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { HifzSession, useApp } from "@/context/AppContext";
 import { useColors } from "@/hooks/useColors";
+import { useAuth } from "@/context/AuthContext";
 import { formatTime } from "@/services/notificationService";
 import { TRANSLATION_OPTIONS } from "@/services/quranApi";
 
-const BADGES = [
-  { icon: "zap" as const, label: "7-Day Streak", color: "#FF6B2B", earned: true },
-  { icon: "book" as const, label: "Surah Master", color: "#0D5C3A", earned: true },
-  { icon: "star" as const, label: "1000 XP", color: "#C8972A", earned: true },
-  { icon: "mic" as const, label: "First Recitation", color: "#8B5CF6", earned: true },
-  { icon: "heart" as const, label: "Memorizer", color: "#DC2626", earned: false },
-  { icon: "award" as const, label: "Quran Finisher", color: "#2563EB", earned: false },
-];
+function computeBadges(progress: ReturnType<typeof useApp>["progress"], hifzSessions: ReturnType<typeof useApp>["hifzSessions"]) {
+  const completedSurahs = Object.values(progress.surahs).filter(s => s.completed).length;
+  const badges = [
+    { icon: "zap" as const, label: "7-Day Streak", color: "#FF6B2B", earned: progress.streak >= 7 },
+    { icon: "book" as const, label: "Surah Master", color: "#0D5C3A", earned: completedSurahs >= 1 },
+    { icon: "star" as const, label: "1000 XP", color: "#C8972A", earned: progress.xp >= 1000 },
+    { icon: "mic" as const, label: "First Recitation", color: "#8B5CF6", earned: hifzSessions.length > 0 },
+    { icon: "heart" as const, label: "Memorizer", color: "#DC2626", earned: progress.ayahsMemorized >= 10 },
+    { icon: "award" as const, label: "Quran Finisher", color: "#2563EB", earned: completedSurahs >= 114 },
+  ];
+  const earnedCount = badges.filter(b => b.earned).length;
+  const totalCount = badges.length;
+  return { badges, earnedCount, totalCount, completedSurahs };
+}
 
 const FONT_SIZES = [18, 20, 22, 24, 26, 28, 32];
 const DAY_ABBR = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -85,6 +92,7 @@ function timeAgo(ts: number): string {
 export default function ProfileScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { user, isAuthenticated, logout } = useAuth();
   const {
     progress, isDarkMode, toggleDarkMode, fontSize, setFontSize,
     translationLang, setTranslationLang, userName, setUserName,
@@ -103,6 +111,13 @@ export default function ProfileScreen() {
   const currentLang = TRANSLATION_OPTIONS.find(t => t.id === translationLang) ?? TRANSLATION_OPTIONS[0]!;
 
   const hifzStats = useMemo(() => getHifzStats(hifzSessions), [hifzSessions]);
+  const { badges: earnedBadges, earnedCount, totalCount, completedSurahs } = useMemo(
+    () => computeBadges(progress, hifzSessions),
+    [progress, hifzSessions]
+  );
+
+  const userTitles = ["Newcomer", "Beginner", "Learner", "Student", "Seeker", "Dedicated", "Devoted", "Scholar", "Master", "Legend"];
+  const userTitle = progress.level <= 10 ? userTitles[0] : progress.level <= 20 ? userTitles[1] : progress.level <= 30 ? userTitles[2] : progress.level <= 40 ? userTitles[3] : progress.level <= 50 ? userTitles[4] : progress.level <= 60 ? userTitles[5] : progress.level <= 70 ? userTitles[6] : progress.level <= 80 ? userTitles[7] : progress.level <= 90 ? userTitles[8] : userTitles[9];
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
@@ -126,7 +141,7 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           </View>
           <Text style={styles.userName}>{userName}</Text>
-          <Text style={styles.userTitle}>Level {progress.level} Learner</Text>
+          <Text style={styles.userTitle}>{userTitle}</Text>
 
           <View style={styles.xpContainer}>
             <View style={styles.xpRow}>
@@ -296,9 +311,12 @@ export default function ProfileScreen() {
 
           {/* ── Achievements ── */}
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Achievements</Text>
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Achievements</Text>
+              <Text style={[styles.achievementCount, { color: colors.mutedForeground }]}>{earnedCount}/{totalCount}</Text>
+            </View>
             <View style={styles.badgesGrid}>
-              {BADGES.map(badge => (
+              {earnedBadges.map(badge => (
                 <View
                   key={badge.label}
                   style={[
@@ -318,19 +336,56 @@ export default function ProfileScreen() {
             </View>
           </View>
 
-          <LinearGradient
-            colors={["#C8972A", "#F0BB54"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={[styles.premiumCard, { borderRadius: colors.radius }]}
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => Alert.alert("Premium Status", "Premium features are currently in development. Stay tuned for offline access and advanced analytics!")}
           >
-            <Feather name="star" size={24} color="#FFFFFF" />
-            <View style={styles.premiumInfo}>
-              <Text style={styles.premiumTitle}>Upgrade to Premium</Text>
-              <Text style={styles.premiumSub}>Offline Quran, advanced analytics, ad-free</Text>
+            <LinearGradient
+              colors={["#C8972A", "#F0BB54"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={[styles.premiumCard, { borderRadius: colors.radius }]}
+            >
+              <Feather name="star" size={24} color="#FFFFFF" />
+              <View style={styles.premiumInfo}>
+                <Text style={styles.premiumTitle}>Upgrade to Premium</Text>
+                <Text style={styles.premiumSub}>Offline Quran, advanced analytics, ad-free</Text>
+              </View>
+              <Feather name="chevron-right" size={20} color="#FFFFFF" />
+            </LinearGradient>
+          </TouchableOpacity>
+
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Account</Text>
+            <View style={[styles.settingsList, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              {isAuthenticated ? (
+                <View style={[styles.settingRow, { borderBottomColor: colors.border, borderBottomWidth: 1 }]}>
+                  <View style={styles.settingLeft}>
+                    <Feather name="user-check" size={18} color={colors.primary} />
+                    <View>
+                      <Text style={[styles.settingLabel, { color: colors.foreground }]}>{user?.name}</Text>
+                      <Text style={[styles.settingSubValue, { color: colors.mutedForeground }]}>{user?.email}</Text>
+                    </View>
+                  </View>
+                  <TouchableOpacity onPress={() => { logout(); }}>
+                    <Feather name="log-out" size={18} color="#DC2626" />
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity
+                  style={[styles.settingRow, { borderBottomColor: colors.border, borderBottomWidth: 1 }]}
+                  onPress={() => router.push("/login" as any)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.settingLeft}>
+                    <Feather name="user" size={18} color={colors.primary} />
+                    <Text style={[styles.settingLabel, { color: colors.foreground }]}>Sign In / Register</Text>
+                  </View>
+                  <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+                </TouchableOpacity>
+              )}
             </View>
-            <Feather name="chevron-right" size={20} color="#FFFFFF" />
-          </LinearGradient>
+          </View>
 
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Settings</Text>
@@ -443,7 +498,11 @@ export default function ProfileScreen() {
                 <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.settingRow} activeOpacity={0.7}>
+              <TouchableOpacity 
+                style={styles.settingRow} 
+                activeOpacity={0.7}
+                onPress={() => Alert.alert("Help & Support", "Have questions or feedback? Email us at support@quranapp.com and we'll get back to you within 24 hours.")}
+              >
                 <View style={styles.settingLeft}>
                   <Feather name="help-circle" size={18} color={colors.primary} />
                   <Text style={[styles.settingLabel, { color: colors.foreground }]}>Help & Support</Text>
@@ -605,6 +664,7 @@ const styles = StyleSheet.create({
   sectionIconBadge: { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center" },
   sectionIcon: { fontSize: 18 },
   sectionTitle: { fontSize: 17, fontFamily: "Inter_700Bold" },
+  achievementCount: { fontSize: 13, fontFamily: "Inter_500Medium" },
   sectionSub: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 1 },
   streakBadge: {
     flexDirection: "row",

@@ -12,7 +12,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { useApp } from "@/context/AppContext";
 import { useColors } from "@/hooks/useColors";
@@ -27,11 +27,10 @@ const JUZ_DATA = Array.from({ length: 30 }, (_, i) => ({
   arabicName: `الجزء ${i + 1}`,
 }));
 
-function SurahItem({ item, onPress, progress, isBookmarked }: {
+function SurahItem({ item, onPress, progress }: {
   item: ApiSurah;
   onPress: () => void;
   progress?: number;
-  isBookmarked?: boolean;
 }) {
   const colors = useColors();
   return (
@@ -46,7 +45,6 @@ function SurahItem({ item, onPress, progress, isBookmarked }: {
       <View style={styles.surahInfo}>
         <View style={styles.surahNameRow}>
           <Text style={[styles.surahName, { color: colors.foreground }]}>{item.englishName}</Text>
-          {isBookmarked && <Feather name="bookmark" size={12} color={colors.accent} />}
         </View>
         <Text style={[styles.surahMeta, { color: colors.mutedForeground }]}>
           {item.englishNameTranslation} • {item.numberOfAyahs} Ayahs • {item.revelationType}
@@ -64,6 +62,7 @@ function SurahItem({ item, onPress, progress, isBookmarked }: {
 
 function JuzView() {
   const colors = useColors();
+  const queryClient = useQueryClient();
   const [selectedJuz, setSelectedJuz] = useState<number | null>(null);
 
   const { data: juzSurahs, isLoading } = useQuery({
@@ -71,7 +70,15 @@ function JuzView() {
     queryFn: () => fetchJuzAyahs(selectedJuz!),
     enabled: selectedJuz !== null,
     staleTime: 1000 * 60 * 60,
+    gcTime: 1000 * 60 * 60 * 24,
   });
+
+  const selectJuz = (num: number) => {
+    setSelectedJuz(num);
+    // Prefetch adjacent juz for fast switching
+    if (num > 1) queryClient.prefetchQuery({ queryKey: ["juz", num - 1], queryFn: () => fetchJuzAyahs(num - 1), staleTime: 1000 * 60 * 60, gcTime: 1000 * 60 * 60 * 24 });
+    if (num < 30) queryClient.prefetchQuery({ queryKey: ["juz", num + 1], queryFn: () => fetchJuzAyahs(num + 1), staleTime: 1000 * 60 * 60, gcTime: 1000 * 60 * 60 * 24 });
+  };
 
   if (!selectedJuz) {
     return (
@@ -82,7 +89,7 @@ function JuzView() {
         renderItem={({ item }) => (
           <TouchableOpacity
             style={[styles.juzRow, { borderBottomColor: colors.border }]}
-            onPress={() => setSelectedJuz(item.number)}
+            onPress={() => selectJuz(item.number)}
             activeOpacity={0.7}
           >
             <View style={[styles.juzBadge, { backgroundColor: colors.secondary }]}>
@@ -148,6 +155,23 @@ function JuzView() {
   );
 }
 
+function buildSurahAyahMap(surahs: ApiSurah[]): number[] {
+  const boundaries: number[] = [];
+  let total = 0;
+  for (const s of surahs) {
+    total += s.numberOfAyahs;
+    boundaries.push(total);
+  }
+  return boundaries;
+}
+
+function globalAyahToSurah(globalNum: number, boundaries: number[]): number {
+  for (let i = 0; i < boundaries.length; i++) {
+    if (globalNum <= boundaries[i]!) return i + 1;
+  }
+  return 1;
+}
+
 export default function QuranScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -159,6 +183,9 @@ export default function QuranScreen() {
 
   const { data: surahs, isLoading, isError, refetch } = useQuranSurahs();
 
+  const totalAyahs = surahs ? surahs.reduce((sum, s) => sum + s.numberOfAyahs, 0) : 6236;
+  const boundaries = surahs ? buildSurahAyahMap(surahs) : [];
+
   const filtered = (surahs ?? []).filter(
     (s) =>
       s.englishName.toLowerCase().includes(search.toLowerCase()) ||
@@ -169,7 +196,7 @@ export default function QuranScreen() {
 
   const displayed =
     activeTab === 2
-      ? filtered.filter((s) => bookmarks.some((b) => Math.floor(b / 1000) === s.number))
+      ? filtered.filter((s) => bookmarks.some((b) => globalAyahToSurah(b, boundaries) === s.number))
       : filtered;
 
   return (
@@ -184,7 +211,7 @@ export default function QuranScreen() {
           <View>
             <Text style={[styles.title, { color: colors.foreground }]}>Al-Quran</Text>
             <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
-              {surahs ? `${surahs.length} Surahs • 30 Juz • 6,236 Ayahs` : "Loading..."}
+              {surahs ? `${surahs.length} Surahs • 30 Juz • ${totalAyahs.toLocaleString()} Ayahs` : "Loading..."}
             </Text>
           </View>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
@@ -243,12 +270,13 @@ export default function QuranScreen() {
         <FlatList
           data={displayed}
           keyExtractor={(item) => String(item.number)}
+          refreshing={isLoading}
+          onRefresh={refetch}
           renderItem={({ item }) => (
             <SurahItem
               item={item}
               onPress={() => router.push(`/surah/${item.number}` as any)}
               progress={progress.surahs[item.number]?.progress}
-              isBookmarked={bookmarks.some((b) => Math.floor(b / 1000) === item.number)}
             />
           )}
           contentContainerStyle={{ paddingBottom: Platform.OS === "web" ? 34 + 84 : insets.bottom + 100 }}

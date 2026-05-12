@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ARABIC_ALPHABET, ArabicLetter, QAIDA_LESSONS } from "@/constants/qaida";
 import { useColors } from "@/hooks/useColors";
+import { useQaidaProgress } from "@/hooks/useQaidaProgress";
 
 function speakArabic(text: string, name: string) {
   if (Platform.OS === "web") {
@@ -68,6 +69,7 @@ function LetterDetailBar({ letter, colors }: { letter: ArabicLetter; colors: any
 export default function QaidaScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { isLessonUnlocked, unlockHint } = useQaidaProgress();
   const [mode, setMode] = useState<"alphabet" | "lessons">("alphabet");
   const [selected, setSelected] = useState<string | null>(null);
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
@@ -124,6 +126,7 @@ export default function QaidaScreen() {
 
       {mode === "alphabet" ? (
         <FlatList
+          key="qaida-alphabet"
           data={ARABIC_ALPHABET}
           keyExtractor={item => item.id}
           numColumns={4}
@@ -165,6 +168,7 @@ export default function QaidaScreen() {
         />
       ) : (
         <FlatList
+          key="qaida-lessons"
           data={QAIDA_LESSONS}
           keyExtractor={item => item.id}
           contentContainerStyle={{
@@ -173,34 +177,50 @@ export default function QaidaScreen() {
             gap: 12,
           }}
           showsVerticalScrollIndicator={false}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={[
-                styles.lessonCard,
-                { backgroundColor: colors.card, borderColor: colors.border, opacity: item.locked ? 0.6 : 1 },
-              ]}
-              onPress={() => router.push({ pathname: "/lesson/[id]", params: { id: item.id } })}
-              disabled={item.locked}
-              activeOpacity={0.75}
-            >
-              <View style={[styles.lessonNum, { backgroundColor: item.locked ? colors.muted : colors.secondary }]}>
-                {item.locked ? (
-                  <Feather name="lock" size={14} color={colors.mutedForeground} />
-                ) : (
-                  <Text style={[styles.lessonNumText, { color: colors.primary }]}>{item.id}</Text>
+          renderItem={({ item }) => {
+            const locked = !isLessonUnlocked(item.id);
+            const hint = unlockHint(item.id);
+            return (
+              <TouchableOpacity
+                style={[
+                  styles.lessonCard,
+                  {
+                    backgroundColor: colors.card,
+                    borderColor: colors.border,
+                    opacity: locked ? 0.62 : 1,
+                  },
+                ]}
+                onPress={() => {
+                  if (locked) return;
+                  router.push({ pathname: "/lesson/[id]", params: { id: item.id } });
+                }}
+                disabled={locked}
+                activeOpacity={locked ? 1 : 0.75}
+              >
+                <View style={[styles.lessonNum, { backgroundColor: locked ? colors.muted : colors.secondary }]}>
+                  {locked ? (
+                    <Feather name="lock" size={14} color={colors.mutedForeground} />
+                  ) : (
+                    <Text style={[styles.lessonNumText, { color: colors.primary }]}>{item.id}</Text>
+                  )}
+                </View>
+                <View style={styles.lessonInfo}>
+                  <Text style={[styles.lessonTitle, { color: locked ? colors.mutedForeground : colors.foreground }]}>
+                    {item.title}
+                  </Text>
+                  <Text style={[styles.lessonSub, { color: colors.mutedForeground }]}>{item.subtitle}</Text>
+                  {locked && hint ? (
+                    <Text style={[styles.lessonLockHint, { color: colors.mutedForeground }]}>{hint}</Text>
+                  ) : null}
+                </View>
+                {!locked && (
+                  <LinearGradient colors={[colors.primary, colors.primaryLight]} style={styles.startBtn}>
+                    <Feather name="play" size={14} color="#FFFFFF" />
+                  </LinearGradient>
                 )}
-              </View>
-              <View style={styles.lessonInfo}>
-                <Text style={[styles.lessonTitle, { color: colors.foreground }]}>{item.title}</Text>
-                <Text style={[styles.lessonSub, { color: colors.mutedForeground }]}>{item.subtitle}</Text>
-              </View>
-              {!item.locked && (
-                <LinearGradient colors={[colors.primary, colors.primaryLight]} style={styles.startBtn}>
-                  <Feather name="play" size={14} color="#FFFFFF" />
-                </LinearGradient>
-              )}
-            </TouchableOpacity>
-          )}
+              </TouchableOpacity>
+            );
+          }}
         />
       )}
     </View>
@@ -268,5 +288,6 @@ const styles = StyleSheet.create({
   lessonInfo: { flex: 1 },
   lessonTitle: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
   lessonSub: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 3 },
+  lessonLockHint: { fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 4, lineHeight: 15 },
   startBtn: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
 });

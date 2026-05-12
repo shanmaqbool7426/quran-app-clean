@@ -1,6 +1,13 @@
 import * as Device from "expo-device";
-import * as Notifications from "expo-notifications";
+import Constants from "expo-constants";
 import { Platform } from "react-native";
+
+/** Loading `expo-notifications` runs push token registration; that is unsupported in Expo Go on Android (SDK 53+). */
+export function shouldLoadExpoNotificationsModule(): boolean {
+  if (Platform.OS === "web") return false;
+  if (Platform.OS === "android" && Constants.appOwnership === "expo") return false;
+  return true;
+}
 
 export interface NotificationPrefs {
   enabled: boolean;
@@ -14,15 +21,33 @@ export const DEFAULT_NOTIF_PREFS: NotificationPrefs = {
   minute: 0,
 };
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+type NotificationsModule = typeof import("expo-notifications");
+
+let notificationsPromise: Promise<NotificationsModule | null> | null = null;
+
+async function loadNotifications(): Promise<NotificationsModule | null> {
+  if (!shouldLoadExpoNotificationsModule()) return null;
+  if (!notificationsPromise) {
+    notificationsPromise = import("expo-notifications").then((N) => {
+      N.setNotificationHandler({
+        handleNotification: async () => ({
+          shouldShowAlert: true,
+          shouldPlaySound: true,
+          shouldSetBadge: false,
+          shouldShowBanner: true,
+          shouldShowList: true,
+        }),
+      });
+      return N;
+    });
+  }
+  return notificationsPromise;
+}
+
+/** Register default handler and return the module (null in environments where the module must not load). */
+export async function getNotificationsModule(): Promise<NotificationsModule | null> {
+  return loadNotifications();
+}
 
 export type PermissionStatus = "granted" | "denied" | "undetermined" | "web";
 
@@ -35,6 +60,9 @@ export async function requestNotificationPermission(): Promise<PermissionStatus>
     return "undetermined";
   }
 
+  const Notifications = await loadNotifications();
+  if (!Notifications) return "undetermined";
+
   const { status: existing } = await Notifications.getPermissionsAsync();
   if (existing === "granted") return "granted";
 
@@ -45,6 +73,8 @@ export async function requestNotificationPermission(): Promise<PermissionStatus>
 export async function getPermissionStatus(): Promise<PermissionStatus> {
   if (Platform.OS === "web") return "web";
   if (!Device.isDevice) return "undetermined";
+  const Notifications = await loadNotifications();
+  if (!Notifications) return "undetermined";
   const { status } = await Notifications.getPermissionsAsync();
   return status as PermissionStatus;
 }
@@ -55,6 +85,9 @@ export async function scheduleDailyReminder(
   notifBody: string
 ): Promise<void> {
   if (Platform.OS === "web") return;
+  const Notifications = await loadNotifications();
+  if (!Notifications) return;
+
   await Notifications.cancelAllScheduledNotificationsAsync();
   if (!prefs.enabled) return;
 
@@ -74,6 +107,8 @@ export async function scheduleDailyReminder(
 
 export async function cancelDailyReminder(): Promise<void> {
   if (Platform.OS === "web") return;
+  const Notifications = await loadNotifications();
+  if (!Notifications) return;
   await Notifications.cancelAllScheduledNotificationsAsync();
 }
 
@@ -90,6 +125,9 @@ export async function sendTestNotification(
     }
     return false;
   }
+
+  const Notifications = await loadNotifications();
+  if (!Notifications) return false;
 
   try {
     await Notifications.scheduleNotificationAsync({

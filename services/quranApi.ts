@@ -172,6 +172,23 @@ export async function fetchScholarTafseer(
   surahId: number,
   ayahNumber: number
 ): Promise<string> {
+  // Try the v4 quran.com API (requires no auth for basic access)
+  try {
+    const res = await fetch(
+      `https://api.quran.com/api/v4/quran/tafsirs/${tafseerId}?verse_key=${surahId}:${ayahNumber}`
+    );
+    if (res.ok) {
+      const data = await res.json() as { tafsirs?: Array<{ text?: string }> };
+      const text = data?.tafsirs?.[0]?.text;
+      if (text) {
+        return text.replace(/<[^>]*>/g, " ").replace(/&[a-z]+;/gi, " ").replace(/\s+/g, " ").trim();
+      }
+    }
+  } catch {
+    // fall through
+  }
+
+  // Fallback: try the old v3-style endpoint
   try {
     const res = await fetch(
       `https://api.quran.com/api/v4/tafsirs/${tafseerId}/verses/by_key/${surahId}:${ayahNumber}`
@@ -179,6 +196,7 @@ export async function fetchScholarTafseer(
     if (!res.ok) return "";
     const data = await res.json() as { tafsir?: { text?: string } };
     const raw = data?.tafsir?.text ?? "";
+    if (!raw) return "";
     return raw.replace(/<[^>]*>/g, " ").replace(/&[a-z]+;/gi, " ").replace(/\s+/g, " ").trim();
   } catch {
     return "";

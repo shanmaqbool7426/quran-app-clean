@@ -97,20 +97,24 @@ function WordChip({ word, isActive, isEven, colors, fontSize }: WordChipProps) {
   const tapScaleAnim = useRef(new Animated.Value(1)).current;
   const [isPlayingWord, setIsPlayingWord] = useState(false);
 
+  // All animations use JS driver: `glowAnim` drives shadowOpacity (not supported on native
+  // driver). Mixing native + JS drivers on the same Animated.View crashes RN.
+  const useAnimDriver = false;
+
   useEffect(() => {
     if (isActive) {
       Animated.loop(
         Animated.sequence([
-          Animated.timing(scaleAnim, { toValue: 1.06, duration: 420, useNativeDriver: true }),
-          Animated.timing(scaleAnim, { toValue: 1, duration: 420, useNativeDriver: true }),
+          Animated.timing(scaleAnim, { toValue: 1.06, duration: 420, useNativeDriver: useAnimDriver }),
+          Animated.timing(scaleAnim, { toValue: 1, duration: 420, useNativeDriver: useAnimDriver }),
         ])
       ).start();
-      Animated.timing(glowAnim, { toValue: 1, duration: 200, useNativeDriver: false }).start();
+      Animated.timing(glowAnim, { toValue: 1, duration: 200, useNativeDriver: useAnimDriver }).start();
     } else {
       scaleAnim.stopAnimation();
       Animated.parallel([
-        Animated.timing(scaleAnim, { toValue: 1, duration: 150, useNativeDriver: true }),
-        Animated.timing(glowAnim, { toValue: 0, duration: 200, useNativeDriver: false }),
+        Animated.timing(scaleAnim, { toValue: 1, duration: 150, useNativeDriver: useAnimDriver }),
+        Animated.timing(glowAnim, { toValue: 0, duration: 200, useNativeDriver: useAnimDriver }),
       ]).start();
     }
   }, [isActive]);
@@ -119,8 +123,8 @@ function WordChip({ word, isActive, isEven, colors, fontSize }: WordChipProps) {
     if (!word.audioUrl) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     Animated.sequence([
-      Animated.timing(tapScaleAnim, { toValue: 0.92, duration: 80, useNativeDriver: true }),
-      Animated.timing(tapScaleAnim, { toValue: 1, duration: 120, useNativeDriver: true }),
+      Animated.timing(tapScaleAnim, { toValue: 0.92, duration: 80, useNativeDriver: false }),
+      Animated.timing(tapScaleAnim, { toValue: 1, duration: 120, useNativeDriver: false }),
     ]).start();
     await playWordAudio(
       word.audioUrl,

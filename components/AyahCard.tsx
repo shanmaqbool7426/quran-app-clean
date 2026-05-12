@@ -1,11 +1,10 @@
-import { Feather } from "@expo/vector-icons";
+import { Feather, Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
   Modal,
   ScrollView,
-  Share,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -19,7 +18,6 @@ import { useColors } from "@/hooks/useColors";
 import { fetchTafseer } from "@/services/aiService";
 import {
   AI_TAFSEER_LANGUAGES,
-  fetchScholarTafseer,
   SCHOLAR_TAFSEERS,
 } from "@/services/quranApi";
 
@@ -65,9 +63,8 @@ export default function AyahCard({
 }: Props) {
   const colors = useColors();
   const { toggleBookmark, bookmarks } = useApp();
-  const ayahId = surahId * 1000 + ayah.number;
+  const ayahId = ayah.globalNumber ?? ayah.number;
   const isBookmarked = bookmarks.includes(ayahId);
-  const [highlighted, setHighlighted] = useState(false);
   const [tafseerVisible, setTafseerVisible] = useState(false);
   const [wbwExpanded, setWbwExpanded] = useState(false);
 
@@ -85,18 +82,8 @@ export default function AyahCard({
   const [tafseerSource, setTafseerSource] = useState<TafseerSource>("ai");
 
   const handleBookmark = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
     toggleBookmark(ayahId);
-  };
-
-  const handleShare = async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    try {
-      await Share.share({
-        message: `${ayah.arabic}\n\n"${ayah.translation}"\n\n— ${surahName} ${surahId}:${ayah.number} | Quran`,
-        title: `${surahName} ${surahId}:${ayah.number}`,
-      });
-    } catch {}
   };
 
   const loadAiTafseer = async (lang: string) => {
@@ -116,9 +103,13 @@ export default function AyahCard({
   const loadScholarTafseer = async (scholarId: number) => {
     setScholarTafseer("");
     setScholarLoading(true);
+    const scholar = SCHOLAR_TAFSEERS.find(s => s.id === scholarId);
     try {
-      const text = await fetchScholarTafseer(scholarId, surahId, ayah.number);
-      setScholarTafseer(text || "Tafseer text not available for this ayah from this source.");
+      const result = await fetchTafseer(
+        surahId, surahName, ayah.number, ayah.arabic, ayah.translation,
+        scholar?.langCode === "ar" ? "Arabic" : "English", scholar?.fullName
+      );
+      setScholarTafseer(result.tafseer);
     } catch {
       setScholarTafseer("Could not load tafseer. Please check your connection.");
     } finally {
@@ -127,7 +118,7 @@ export default function AyahCard({
   };
 
   const handleTafseer = async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    try { await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
     setTafseerVisible(true);
     if (tafseerSource === "ai" && !aiTafseer) {
       await loadAiTafseer(tafseerLang);
@@ -168,9 +159,8 @@ export default function AyahCard({
         style={[
           styles.container,
           {
-            backgroundColor: isPlaying ? colors.secondary : highlighted ? colors.muted : colors.card,
+            backgroundColor: isPlaying ? colors.secondary : colors.card,
             borderColor: isPlaying ? colors.primary : colors.border,
-            borderWidth: isPlaying ? 2 : 1,
           },
         ]}
       >
@@ -186,7 +176,7 @@ export default function AyahCard({
             {onPlayPress && (
               <TouchableOpacity
                 onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
                   onPlayPress();
                 }}
                 style={[styles.actionBtn, { backgroundColor: isPlaying ? colors.primary : colors.muted }]}
@@ -200,32 +190,18 @@ export default function AyahCard({
             )}
 
             <TouchableOpacity
-              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setWbwExpanded(p => !p); }}
-              style={[styles.iconBtn, wbwExpanded && { backgroundColor: colors.primary + "20", borderRadius: 10 }]}
-            >
-              <Feather name="grid" size={14} color={wbwExpanded ? colors.primary : colors.mutedForeground} />
-            </TouchableOpacity>
-
-            <TouchableOpacity
               onPress={handleTafseer}
-              style={[styles.iconBtn, { backgroundColor: "#8B5CF620", borderRadius: 12 }]}
+              style={[styles.iconBtn, { backgroundColor: "#8B5CF615", borderRadius: 10 }]}
             >
-              <Feather name="book" size={14} color="#8B5CF6" />
-            </TouchableOpacity>
-
-            <TouchableOpacity onPress={handleShare} style={styles.iconBtn}>
-              <Feather name="share-2" size={14} color={colors.mutedForeground} />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setHighlighted(p => !p); }}
-              style={styles.iconBtn}
-            >
-              <Feather name="edit-2" size={14} color={highlighted ? colors.accent : colors.mutedForeground} />
+              <Feather name="book" size={13} color="#8B5CF6" />
             </TouchableOpacity>
 
             <TouchableOpacity onPress={handleBookmark} style={styles.iconBtn}>
-              <Feather name="bookmark" size={14} color={isBookmarked ? colors.accent : colors.mutedForeground} />
+              {isBookmarked ? (
+                <Ionicons name="bookmark" size={15} color="#10B981" />
+              ) : (
+                <Feather name="bookmark" size={13} color={colors.mutedForeground} />
+              )}
             </TouchableOpacity>
           </View>
         </View>
@@ -252,14 +228,14 @@ export default function AyahCard({
 
         {/* ── Word-by-word overlay ── */}
         {(showWordByWord || wbwExpanded) && (
-          <View style={[styles.wbwContainer, { backgroundColor: colors.background, borderColor: colors.primary + "30" }]}>
+          <View style={[styles.wbwContainer, { backgroundColor: colors.background, borderColor: colors.primary + "25" }]}>
             <View style={styles.wbwHeader}>
-              <View style={[styles.wbwBadge, { backgroundColor: colors.primary + "15" }]}>
-                <Feather name="grid" size={11} color={colors.primary} />
+              <View style={[styles.wbwBadge, { backgroundColor: colors.primary + "12" }]}>
+                <Feather name="grid" size={10} color={colors.primary} />
                 <Text style={[styles.wbwBadgeText, { color: colors.primary }]}>Word-by-Word</Text>
               </View>
               <TouchableOpacity onPress={() => setWbwExpanded(false)} style={styles.wbwClose}>
-                <Feather name="chevron-up" size={16} color={colors.mutedForeground} />
+                <Feather name="chevron-up" size={14} color={colors.mutedForeground} />
               </TouchableOpacity>
             </View>
             <WordByWordView
@@ -281,31 +257,13 @@ export default function AyahCard({
 
         {/* ── Translation ── */}
         {showTranslation && (
-          <Text style={[styles.translation, { color: colors.mutedForeground }]}>
-            {ayah.translation}
-          </Text>
-        )}
-
-        {/* ── Quick-action row ── */}
-        <View style={styles.quickRow}>
-          <TouchableOpacity
-            style={[styles.quickBtn, { backgroundColor: wbwExpanded ? colors.primary + "15" : colors.muted, borderColor: wbwExpanded ? colors.primary + "40" : colors.border }]}
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setWbwExpanded(p => !p); }}
-          >
-            <Feather name="grid" size={12} color={wbwExpanded ? colors.primary : colors.mutedForeground} />
-            <Text style={[styles.quickBtnText, { color: wbwExpanded ? colors.primary : colors.mutedForeground }]}>
-              {wbwExpanded ? "Hide words" : "Word-by-word"}
+          <View style={styles.translationWrap}>
+            <View style={[styles.translationAccent, { backgroundColor: colors.primary + "30" }]} />
+            <Text style={[styles.translation, { color: colors.mutedForeground }]}>
+              {ayah.translation}
             </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.quickBtn, { backgroundColor: "#8B5CF610", borderColor: "#8B5CF630" }]}
-            onPress={handleTafseer}
-          >
-            <Feather name="cpu" size={12} color="#8B5CF6" />
-            <Text style={[styles.quickBtnText, { color: "#8B5CF6" }]}>Tafseer</Text>
-          </TouchableOpacity>
-        </View>
+          </View>
+        )}
       </View>
 
       {/* ── Tafseer modal ── */}
@@ -429,7 +387,7 @@ export default function AyahCard({
                   <Text style={[styles.tafseerLoadingText, { color: colors.mutedForeground }]}>
                     {tafseerSource === "ai"
                       ? `Generating tafseer in ${tafseerLang}...`
-                      : `Loading ${selectedScholar.scholar} tafseer...`}
+                      : `Generating ${selectedScholar.scholar} tafseer...`}
                   </Text>
                 </View>
               ) : tafseerContent ? (
@@ -464,15 +422,19 @@ export default function AyahCard({
                     <Text style={[styles.tafseerText, { color: colors.foreground }]}>{tafseerContent}</Text>
                   </View>
 
-                  {tafseerSource === "ai" && (
-                    <TouchableOpacity
-                      style={[styles.refreshTafseer, { borderColor: colors.border }]}
-                      onPress={() => { setAiTafseer(""); loadAiTafseer(tafseerLang); }}
-                    >
-                      <Feather name="refresh-cw" size={14} color={colors.mutedForeground} />
-                      <Text style={[styles.refreshTafseerText, { color: colors.mutedForeground }]}>Regenerate</Text>
-                    </TouchableOpacity>
-                  )}
+                  <TouchableOpacity
+                    style={[styles.refreshTafseer, { borderColor: colors.border }]}
+                    onPress={() => {
+                      if (tafseerSource === "ai") {
+                        setAiTafseer(""); loadAiTafseer(tafseerLang);
+                      } else {
+                        setScholarTafseer(""); loadScholarTafseer(selectedScholarId);
+                      }
+                    }}
+                  >
+                    <Feather name="refresh-cw" size={14} color={colors.mutedForeground} />
+                    <Text style={[styles.refreshTafseerText, { color: colors.mutedForeground }]}>Regenerate</Text>
+                  </TouchableOpacity>
                 </>
               ) : (
                 <View style={styles.tafseerLoading}>
@@ -497,25 +459,30 @@ export default function AyahCard({
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 18, marginHorizontal: 20, marginBottom: 12, borderRadius: 16 },
-  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
-  ayahNum: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center" },
-  ayahNumText: { fontSize: 12, fontFamily: "Inter_700Bold" },
-  actions: { flexDirection: "row", gap: 6, alignItems: "center" },
+  container: {
+    padding: 14,
+    marginHorizontal: 12,
+    marginBottom: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 14 },
+  ayahNum: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
+  ayahNumText: { fontSize: 13, fontFamily: "Inter_700Bold" },
+  actions: { flexDirection: "row", gap: 4, alignItems: "center" },
   actionBtn: { width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center" },
-  iconBtn: { padding: 5 },
-  arabic: { textAlign: "right", lineHeight: 44, fontWeight: "400", writingDirection: "rtl", marginBottom: 4 },
-  hifzContainer: { borderWidth: 1, borderRadius: 14, padding: 14, marginTop: 4, marginBottom: 4, gap: 10 },
-  wbwContainer: { borderWidth: 1, borderRadius: 14, padding: 14, marginTop: 8, marginBottom: 4, gap: 10 },
+  iconBtn: { width: 28, height: 28, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  arabic: { textAlign: "right", lineHeight: 48, fontWeight: "400", writingDirection: "rtl", marginBottom: 2, letterSpacing: 0.5 },
+  hifzContainer: { borderWidth: 1, borderRadius: 12, padding: 12, marginTop: 4, marginBottom: 4, gap: 10 },
+  wbwContainer: { borderWidth: 1, borderRadius: 12, padding: 12, marginTop: 8, gap: 10 },
   wbwHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  wbwBadge: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
-  wbwBadgeText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
+  wbwBadge: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
+  wbwBadgeText: { fontSize: 10, fontFamily: "Inter_600SemiBold" },
   wbwClose: { padding: 4 },
-  transliteration: { fontSize: 13, fontFamily: "Inter_400Regular", fontStyle: "italic", marginBottom: 8, lineHeight: 20 },
-  translation: { fontSize: 14, fontFamily: "Inter_400Regular", lineHeight: 22 },
-  quickRow: { flexDirection: "row", gap: 8, marginTop: 12, flexWrap: "wrap" },
-  quickBtn: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
-  quickBtnText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
+  transliteration: { fontSize: 12, fontFamily: "Inter_400Regular", fontStyle: "italic", marginBottom: 6, lineHeight: 18 },
+  translationWrap: { flexDirection: "row", gap: 8 },
+  translationAccent: { width: 3, borderRadius: 2, marginTop: 2 },
+  translation: { flex: 1, fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 20 },
 
   // Modal
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },

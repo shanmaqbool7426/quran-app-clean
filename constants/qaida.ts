@@ -120,18 +120,69 @@ export const LESSON_DATA: Record<string, LessonContent> = {
       { id: "5-2", arabic: "أَبَّ", transliteration: "Abba", meaning: "Ba with Shaddah" },
       { id: "5-3", arabic: "أَبِّ", transliteration: "Abbi", meaning: "Ba with Shaddah & Kasra" },
       { id: "5-4", arabic: "أَبُّ", transliteration: "Abbu", meaning: "Ba with Shaddah & Damma" },
-    ]
-  }
+    ],
+  },
+  "6": {
+    id: "6",
+    title: "Noon Sakin & Tanwin",
+    description: "Four rules when نْ or tanwin meets the next letter: Ikhfa, Izhar, Idgham, and Iqlab.",
+    items: [
+      { id: "6-1", arabic: "مِنْ كِتَابٍ", transliteration: "Ikhfa", meaning: "Hide noon before ك" },
+      { id: "6-2", arabic: "مِنْ رَبِّكَ", transliteration: "Izhar", meaning: "Clear noon before ر" },
+      { id: "6-3", arabic: "مِنْ مَّالٍ", transliteration: "Idgham", meaning: "Merge into م (with ghunnah)" },
+      { id: "6-4", arabic: "مِنْ بَعْدِ", transliteration: "Iqlab", meaning: "Turn noon into م sound before ب" },
+      { id: "6-5", arabic: "عَلِيمٌ حَكِيمٌ", transliteration: "Ikhfa", meaning: "Tanwin + ح (practice)" },
+      { id: "6-6", arabic: "سَمِيعٌ بَصِيرٌ", transliteration: "Iqlab", meaning: "Tanwin + ب (practice)" },
+    ],
+  },
+  "7": {
+    id: "7",
+    title: "Mim Sakin Rules",
+    description: "Rules when مْ meets the next letter: Ikhfa Shafawi, Idgham Shafawi, Izhar Shafawi, and Iqlab.",
+    items: [
+      { id: "7-1", arabic: "لَهُمْ بِهَا", transliteration: "Ikhfa Shafawi", meaning: "Hide م before ب" },
+      { id: "7-2", arabic: "فَأَتْبَعَهُمْ مَنْ", transliteration: "Idgham Shafawi", meaning: "Merge مْ into م" },
+      { id: "7-3", arabic: "عَلِيمٌ بِذَٰلِكَ", transliteration: "Ikhfa Shafawi", meaning: "مْ before ذ (practice)" },
+      { id: "7-4", arabic: "أَنتَ وَلِيُّنَا", transliteration: "Idgham Shafawi", meaning: "مْ before م (practice)" },
+      { id: "7-5", arabic: "لَهُمْ عَذَابٌ", transliteration: "Izhar Shafawi", meaning: "Clear م before ع" },
+      { id: "7-6", arabic: "لَهُمْ وَزِيرٌ", transliteration: "Izhar Shafawi", meaning: "Clear م before و" },
+    ],
+  },
+  "8": {
+    id: "8",
+    title: "Madd (Tajweed)",
+    description: "Natural lengthening (Madd Asli) and other common madd types you meet in the Mushaf.",
+    items: [
+      { id: "8-1", arabic: "قَالَ", transliteration: "Madd by Alif", meaning: "Natural madd after فتح" },
+      { id: "8-2", arabic: "سُوءٌ", transliteration: "Madd by Waw", meaning: "Lengthen و with ضمة" },
+      { id: "8-3", arabic: "قِيلَ", transliteration: "Madd by Ya", meaning: "Lengthen ي with كسرة" },
+      { id: "8-4", arabic: "آمَنُوا", transliteration: "Madd Lazim", meaning: "Must lengthen after همزة on Alif" },
+      { id: "8-5", arabic: "السَّمَاءُ", transliteration: "Madd Munfasil", meaning: "Hamzah after madd letter" },
+      { id: "8-6", arabic: "جَاءَ", transliteration: "Madd Arid", meaning: "Stopping on madd letter" },
+    ],
+  },
 };
 
-export const QAIDA_LESSONS = [
-  { id: "1", title: "Arabic Alphabet", subtitle: "28 letters", completed: false, locked: false },
-  { id: "2", title: "Harakat (Vowels)", subtitle: "Fatha, Kasra, Damma", completed: false, locked: false },
-  { id: "3", title: "Tanwin", subtitle: "Double vowels", completed: false, locked: false },
-  { id: "4", title: "Madd (Stretching)", subtitle: "Long vowels", completed: false, locked: false },
-  { id: "5", title: "Sukun & Shaddah", subtitle: "No vowel & double letter", completed: false, locked: false },
-  { id: "6", title: "Noon Sakin Rules", subtitle: "Izhar, Idgham, Iqlab, Ikhfa", completed: false, locked: true },
-  { id: "7", title: "Mim Sakin Rules", subtitle: "Ikhfa Shafawi, Idgham", completed: false, locked: true },
-  { id: "8", title: "Madd Rules", subtitle: "Types of prolongation", completed: false, locked: true },
+export interface QaidaLessonMeta {
+  id: string;
+  title: string;
+  subtitle: string;
+}
+
+export const QAIDA_LESSONS: QaidaLessonMeta[] = [
+  { id: "1", title: "Arabic Alphabet", subtitle: "28 letters" },
+  { id: "2", title: "Harakat (Vowels)", subtitle: "Fatha, Kasra, Damma" },
+  { id: "3", title: "Tanwin", subtitle: "Double vowels" },
+  { id: "4", title: "Madd (Stretching)", subtitle: "Long vowels" },
+  { id: "5", title: "Sukun & Shaddah", subtitle: "No vowel & double letter" },
+  { id: "6", title: "Noon Sakin Rules", subtitle: "Izhar, Idgham, Iqlab, Ikhfa" },
+  { id: "7", title: "Mim Sakin Rules", subtitle: "Ikhfa Shafawi, Idgham" },
+  { id: "8", title: "Madd Rules", subtitle: "Types of prolongation" },
 ];
+
+export const QAIDA_LESSON_ORDER = QAIDA_LESSONS.map((l) => l.id);
+
+export function getQaidaLessonTitle(id: string): string {
+  return QAIDA_LESSONS.find((l) => l.id === id)?.title ?? `Lesson ${id}`;
+}
 

@@ -28,36 +28,50 @@ export const HADITH_COLLECTIONS: HadithCollection[] = [
 ];
 
 export async function fetchHadiths(edition: string, bookNumber: number = 1): Promise<Hadith[]> {
-  const url = `${BASE}/${edition}/${bookNumber}.min.json`;
+  const url = `${BASE}/${edition}/sections/${bookNumber}.min.json`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Hadith API error: ${res.status}`);
   const data = await res.json();
 
   const hadiths: Hadith[] = [];
-  const raw = data.hadiths ?? data;
 
-  if (Array.isArray(raw)) {
-    raw.forEach((h: any) => {
+  if (Array.isArray(data)) {
+    data.forEach((h: any, idx: number) => {
       hadiths.push({
-        number: h.hadithnumber ?? h.number ?? hadiths.length + 1,
-        body: h.body ?? h.text ?? "",
+        number: h.hadithnumber ?? h.number ?? idx + 1,
+        body: h.text ?? h.body ?? "",
         collection: edition,
         bookNumber,
         reference: h.reference ? `Book ${h.reference.book}, Hadith ${h.reference.hadith}` : undefined,
       });
     });
-  } else if (typeof raw === "object") {
-    Object.entries(raw).forEach(([key, val]: [string, any]) => {
+  } else if (data.hadiths && Array.isArray(data.hadiths)) {
+    data.hadiths.forEach((h: any) => {
       hadiths.push({
-        number: parseInt(key) || hadiths.length + 1,
-        body: typeof val === "string" ? val : val?.body ?? val?.text ?? JSON.stringify(val),
+        number: h.hadithnumber ?? h.number ?? hadiths.length + 1,
+        body: h.text ?? h.body ?? "",
+        collection: edition,
+        bookNumber,
+        reference: h.reference ? `Book ${h.reference.book}, Hadith ${h.reference.hadith}` : undefined,
+      });
+    });
+  } else if (typeof data === "object") {
+    Object.entries(data).forEach(([key, val]: [string, any]) => {
+      if (key === "name" || key === "metadata" || key === "hadiths") return;
+      const num = parseInt(key);
+      if (isNaN(num)) return;
+      hadiths.push({
+        number: num,
+        body: val?.text ?? val?.body ?? (typeof val === "string" ? val : ""),
         collection: edition,
         bookNumber,
       });
     });
   }
 
-  return hadiths.filter(h => h.body && h.body.length > 10);
+  return hadiths
+    .filter(h => h.body && h.body.length > 10)
+    .sort((a, b) => a.number - b.number);
 }
 
 export const SAMPLE_HADITHS: Hadith[] = [

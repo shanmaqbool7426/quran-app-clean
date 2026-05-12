@@ -55,11 +55,11 @@ export interface AppContextType {
 }
 
 const defaultProgress: UserProgress = {
-  streak: 7,
-  xp: 1240,
-  level: 5,
-  totalMinutes: 342,
-  ayahsMemorized: 47,
+  streak: 0,
+  xp: 0,
+  level: 1,
+  totalMinutes: 0,
+  ayahsMemorized: 0,
   surahs: {},
 };
 
@@ -68,12 +68,12 @@ const AppContext = createContext<AppContextType | null>(null);
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [progress, setProgress] = useState<UserProgress>(defaultProgress);
   const [bookmarks, setBookmarks] = useState<number[]>([]);
-  const [lastRead, setLastReadState] = useState<{ surahId: number; ayah: number } | null>({ surahId: 1, ayah: 1 });
+  const [lastRead, setLastReadState] = useState<{ surahId: number; ayah: number } | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [tasbeehCount, setTasbeehCount] = useState(0);
   const [fontSize, setFontSizeState] = useState(24);
   const [translationLang, setTranslationLangState] = useState("en.asad");
-  const [userName, setUserNameState] = useState("Ahmad Al-Rashid");
+  const [userName, setUserNameState] = useState("Guest");
   const [dailyGoalMinutes, setDailyGoalMinutesState] = useState(30);
   const [sessionMinutes, setSessionMinutes] = useState(0);
   const [hifzSessions, setHifzSessions] = useState<HifzSession[]>([]);

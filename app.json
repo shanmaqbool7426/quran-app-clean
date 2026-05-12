@@ -26,7 +26,15 @@
     "plugins": [
       "expo-router",
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "windowSoftInputMode": "adjustResize"
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
