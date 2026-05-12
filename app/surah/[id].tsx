@@ -4,18 +4,20 @@ import * as Haptics from "expo-haptics";
 import React, { useState, useRef, useCallback } from "react";
 import {
   ActivityIndicator,
-  FlatList,
   Modal,
   Platform,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
-  NativeSyntheticEvent,
   NativeScrollEvent,
+  NativeSyntheticEvent,
+  FlatList,
+  View,
 } from "react-native";
+import { FlashList as ShopifyFlashList, ListRenderItemInfo } from "@shopify/flash-list";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+const TypedFlashList = ShopifyFlashList as any;
 
 import AudioPlayer from "@/components/AudioPlayer";
 import AyahCard from "@/components/AyahCard";
@@ -25,6 +27,7 @@ import { useApp } from "@/context/AppContext";
 import { useQuranSurah } from "@/hooks/useQuranSurah";
 import { useColors } from "@/hooks/useColors";
 import { AUDIO_CDN, TRANSLATION_OPTIONS } from "@/services/quranApi";
+import { downloadAudio } from "@/services/offlineService";
 
 const FONT_SIZES = [18, 20, 22, 24, 26, 28, 32];
 
@@ -48,7 +51,9 @@ export default function SurahScreen() {
   const [audioDuration, setAudioDuration] = useState(0);
   const [langModalVisible, setLangModalVisible] = useState(false);
   const [fontModalVisible, setFontModalVisible] = useState(false);
-  const listRef = useRef<FlatList>(null);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState(0);
+  const listRef = useRef<any>(null);
 
   const currentTranslation =
     TRANSLATION_OPTIONS.find((t) => t.id === translationLang) ?? TRANSLATION_OPTIONS[0]!;
@@ -81,6 +86,29 @@ export default function SurahScreen() {
     );
     setLastRead(surahId, ayahNumbers[ayahIndex] ?? ayahIndex + 1);
   }, [data, ayahNumbers, surahId, setLastRead]);
+
+  const handleDownload = async () => {
+    if (!data || isDownloading) return;
+    try {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setIsDownloading(true);
+      setDownloadProgress(0);
+
+      const total = data.audioAyahs.length;
+      for (let i = 0; i < total; i++) {
+        const ayah = data.audioAyahs[i];
+        const url = ayah.audio ?? `${AUDIO_CDN}/${reciter.edition}/${ayah.number}.mp3`;
+        await downloadAudio(url);
+        setDownloadProgress((i + 1) / total);
+      }
+
+      setIsDownloading(false);
+      alert("Surah downloaded for offline use!");
+    } catch (error) {
+      setIsDownloading(false);
+      console.error("Download failed:", error);
+    }
+  };
 
   const surahDescription =
     data?.surah.revelationType === "Meccan"
@@ -148,7 +176,7 @@ export default function SurahScreen() {
             label="Word-by-Word"
             active={showWordByWord}
             onPress={() => {
-              try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); } catch {}
+              try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); } catch { }
               setShowWordByWord((p) => !p);
             }}
             colors={colors}
@@ -164,7 +192,7 @@ export default function SurahScreen() {
               },
             ]}
             onPress={() => {
-              try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); } catch {}
+              try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); } catch { }
               if (hifzMode) {
                 setHifzMode(false);
               } else {
@@ -198,6 +226,34 @@ export default function SurahScreen() {
             <Text style={[styles.controlText, { color: colors.mutedForeground }]}>
               {fontSize}px
             </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.controlBtn,
+              {
+                backgroundColor: isDownloading ? colors.primary + "20" : colors.muted,
+                flexDirection: "row",
+                gap: 6,
+                minWidth: 100
+              }
+            ]}
+            onPress={handleDownload}
+            disabled={isDownloading}
+          >
+            {isDownloading ? (
+              <>
+                <ActivityIndicator size="small" color={colors.primary} />
+                <Text style={[styles.controlText, { color: colors.primary }]}>
+                  {Math.round(downloadProgress * 100)}%
+                </Text>
+              </>
+            ) : (
+              <>
+                <Feather name="download" size={12} color={colors.primary} />
+                <Text style={[styles.controlText, { color: colors.primary }]}>Download</Text>
+              </>
+            )}
           </TouchableOpacity>
         </ScrollView>
 
@@ -281,15 +337,14 @@ export default function SurahScreen() {
         </View>
       )}
 
-      {/* ── Ayah list (FlatList for smooth performance) ── */}
+      {/* ── Ayah list (FlashList for smooth performance) ── */}
       {data && (
-        <FlatList
+        // @ts-ignore
+        <TypedFlashList
           ref={listRef}
           data={data.arabicAyahs}
-          keyExtractor={(item) => String(item.numberInSurah)}
-          initialNumToRender={8}
-          maxToRenderPerBatch={8}
-          windowSize={7}
+          keyExtractor={(item: any) => String(item.numberInSurah)}
+          estimatedItemSize={250}
           removeClippedSubviews={Platform.OS !== "web"}
           contentContainerStyle={{
             paddingTop: 8,
@@ -384,7 +439,7 @@ export default function SurahScreen() {
               )}
             </>
           }
-          renderItem={({ item: arabicAyah, index: idx }) => {
+          renderItem={({ item: arabicAyah, index: idx }: ListRenderItemInfo<any>) => {
             const translationAyah = data.translationAyahs[idx];
             const audioAyah = data.audioAyahs[idx];
             const audioUrl =

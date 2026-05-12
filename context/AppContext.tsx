@@ -8,6 +8,9 @@ import {
   cancelDailyReminder,
 } from "@/services/notificationService";
 import { DAILY_AYAHS } from "@/constants/quranData";
+import { initOfflineDatabase } from "@/services/offlineService";
+
+const APP_DATA_VERSION = "1";
 
 interface UserProgress {
   streak: number;
@@ -80,6 +83,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [notificationPrefs, setNotificationPrefsState] = useState<NotificationPrefs>(DEFAULT_NOTIF_PREFS);
 
   useEffect(() => {
+    initOfflineDatabase();
     loadData();
   }, []);
 
@@ -88,7 +92,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const [
         savedProgress, savedBookmarks, savedLastRead, savedDark,
         savedTasbeeh, savedFontSize, savedLang, savedName, savedGoal,
-        savedHifzSessions, savedNotifPrefs,
+        savedHifzSessions, savedNotifPrefs, savedVersion,
       ] = await Promise.all([
         AsyncStorage.getItem("progress"),
         AsyncStorage.getItem("bookmarks"),
@@ -101,7 +105,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         AsyncStorage.getItem("dailyGoalMinutes"),
         AsyncStorage.getItem("hifzSessions"),
         AsyncStorage.getItem("notificationPrefs"),
+        AsyncStorage.getItem("app_data_version"),
       ]);
+
       if (savedProgress) setProgress(JSON.parse(savedProgress));
       if (savedBookmarks) setBookmarks(JSON.parse(savedBookmarks));
       if (savedLastRead) setLastReadState(JSON.parse(savedLastRead));
@@ -109,7 +115,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (savedTasbeeh) setTasbeehCount(JSON.parse(savedTasbeeh));
       if (savedFontSize) setFontSizeState(JSON.parse(savedFontSize));
       if (savedLang) setTranslationLangState(JSON.parse(savedLang));
-      if (savedName) setUserNameState(JSON.parse(savedName));
+      
+      // Professional Migration Logic
+      if (savedVersion !== APP_DATA_VERSION) {
+        // This is a legacy user (Ahmad era) or a new install
+        if (!savedVersion) {
+          // Reset hardcoded Ahmad name for legacy users
+          setUserNameState("Guest");
+          AsyncStorage.setItem("userName", JSON.stringify("Guest"));
+        }
+        AsyncStorage.setItem("app_data_version", APP_DATA_VERSION);
+      } else if (savedName) {
+        setUserNameState(JSON.parse(savedName));
+      }
       if (savedGoal) setDailyGoalMinutesState(JSON.parse(savedGoal));
       if (savedHifzSessions) setHifzSessions(JSON.parse(savedHifzSessions));
       if (savedNotifPrefs) setNotificationPrefsState(JSON.parse(savedNotifPrefs));

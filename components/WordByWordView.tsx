@@ -1,5 +1,5 @@
 import { Feather } from "@expo/vector-icons";
-import { Audio } from "expo-av";
+import { createAudioPlayer } from "expo-audio";
 import * as Haptics from "expo-haptics";
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -16,7 +16,7 @@ import { useColors } from "@/hooks/useColors";
 import { fetchWordByWord, WordByWord } from "@/services/quranApi";
 
 // ── Module-level audio singleton so only one word plays at a time ──────────────
-let _nativeSound: Audio.Sound | null = null;
+let _nativePlayer: any = null;
 let _webAudio: HTMLAudioElement | null = null;
 let _playingUrl = "";
 let _stopCurrentCallback: (() => void) | null = null;
@@ -29,9 +29,11 @@ async function stopCurrentWordAudio() {
   if (Platform.OS === "web") {
     if (_webAudio) { _webAudio.pause(); _webAudio.src = ""; _webAudio = null; }
   } else {
-    if (_nativeSound) {
-      try { await _nativeSound.stopAsync(); await _nativeSound.unloadAsync(); } catch {}
-      _nativeSound = null;
+    if (_nativePlayer) {
+      try { 
+        _nativePlayer.pause();
+      } catch {}
+      _nativePlayer = null;
     }
   }
   _playingUrl = "";
@@ -66,16 +68,14 @@ async function playWordAudio(
     } catch { onStop(); }
   } else {
     try {
-      await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
-      const { sound } = await Audio.Sound.createAsync({ uri: url }, { shouldPlay: true });
-      _nativeSound = sound;
-      sound.setOnPlaybackStatusUpdate((status) => {
-        if (status.isLoaded && status.didJustFinish) {
+      _nativePlayer = createAudioPlayer(url);
+      _nativePlayer.play();
+      _nativePlayer.addListener("playbackStatusUpdate", (status: any) => {
+        if (status.didJustFinish) {
           _playingUrl = "";
-          _nativeSound = null;
+          _nativePlayer = null;
           _stopCurrentCallback = null;
           onStop();
-          sound.unloadAsync().catch(() => {});
         }
       });
     } catch { onStop(); }

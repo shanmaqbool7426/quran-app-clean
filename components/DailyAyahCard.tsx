@@ -1,5 +1,5 @@
 import { Feather } from "@expo/vector-icons";
-import { Audio } from "expo-av";
+import { useAudioPlayer } from "expo-audio";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useState } from "react";
@@ -15,7 +15,6 @@ const todayIdx = new Date().getDate() % DAILY_AYAHS.length;
 export default function DailyAyahCard() {
   const colors = useColors();
   const [isPlaying, setIsPlaying] = useState(false);
-  const [sound, setSound] = useState<Audio.Sound | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ["dailyAyah"],
@@ -28,37 +27,26 @@ export default function DailyAyahCard() {
   const arabic = data?.arabic ?? fallback.arabic;
   const translation = data?.translation ?? fallback.translation;
   const reference = data?.reference ?? fallback.reference;
+  const player = useAudioPlayer(data?.audioUrl || "");
 
   const handlePlay = async () => {
     if (!data?.audioUrl) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
-    if (isPlaying && sound) {
-      await sound.pauseAsync();
+    if (player.playing) {
+      player.pause();
       setIsPlaying(false);
-      return;
+    } else {
+      player.play();
+      setIsPlaying(true);
     }
 
-    if (sound) {
-      await sound.playAsync();
-      setIsPlaying(true);
-      return;
-    }
-
-    try {
-      await Audio.setAudioModeAsync({ playsInSilentModeIOS: true, allowsRecordingIOS: false });
-      const { sound: newSound } = await Audio.Sound.createAsync(
-        { uri: data.audioUrl },
-        { shouldPlay: true },
-        (status) => {
-          if (status.isLoaded && status.didJustFinish) setIsPlaying(false);
-        }
-      );
-      setSound(newSound);
-      setIsPlaying(true);
-    } catch {
-      setIsPlaying(false);
-    }
+    // Listen for completion
+    player.addListener("playbackStatusUpdate", (status) => {
+      if (status.didJustFinish) {
+        setIsPlaying(false);
+      }
+    });
   };
 
   return (

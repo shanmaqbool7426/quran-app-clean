@@ -1,5 +1,5 @@
 import { Feather } from "@expo/vector-icons";
-import { Audio, AVPlaybackStatus } from "expo-av";
+import { createAudioPlayer } from "expo-audio";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -121,7 +121,7 @@ export default function AudioPlayer({
   surahName,
 }: Props) {
   const colors = useColors();
-  const soundRef = useRef<Audio.Sound | null>(null);
+  const playerRef = useRef<any>(null);
   const [playerState, setPlayerState] = useState<PlayerState>("idle");
   const [position, setPosition] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -130,15 +130,11 @@ export default function AudioPlayer({
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    if (Platform.OS !== "web") {
-      Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: true,
-      }).catch(() => {});
-    }
     return () => {
-      soundRef.current?.unloadAsync();
+      if (playerRef.current) {
+        playerRef.current.pause();
+        playerRef.current = null;
+      }
       webAudio?.stop();
     };
   }, []);
@@ -157,10 +153,13 @@ export default function AudioPlayer({
   }, [playerState]);
 
   const handleProgress = useCallback((pos: number, dur: number) => {
-    setPosition(pos);
-    setDuration(dur);
-    if (dur > 0) progressAnim.setValue(pos / dur);
-    onProgress?.(pos, dur);
+    const validPos = isNaN(pos) ? 0 : pos;
+    const validDur = isNaN(dur) ? 0 : dur;
+    
+    setPosition(validPos);
+    setDuration(validDur);
+    if (validDur > 0) progressAnim.setValue(validPos / validDur);
+    onProgress?.(validPos, validDur);
   }, [onProgress]);
 
   const loadAndPlay = useCallback(
@@ -189,24 +188,24 @@ export default function AudioPlayer({
       }
 
       try {
-        if (soundRef.current) {
-          await soundRef.current.unloadAsync();
-          soundRef.current = null;
+        if (playerRef.current) {
+          playerRef.current.pause();
+          playerRef.current = null;
         }
-        const { sound } = await Audio.Sound.createAsync(
-          { uri: url },
-          { shouldPlay: true },
-          (status: AVPlaybackStatus) => {
-            if (!status.isLoaded) return;
-            handleProgress(status.positionMillis, status.durationMillis ?? 0);
-            if (status.didJustFinish) {
-              const next = index + 1;
-              if (next < audioUrls.length) { onAyahChange(next); loadAndPlay(next); }
-              else setPlayerState("idle");
-            }
+        
+        const player = createAudioPlayer(url);
+        playerRef.current = player;
+        player.play();
+        
+        player.addListener("playbackStatusUpdate", (status: any) => {
+          handleProgress(status.positionMillis, status.durationMillis ?? 0);
+          if (status.didJustFinish) {
+            const next = index + 1;
+            if (next < audioUrls.length) { onAyahChange(next); loadAndPlay(next); }
+            else setPlayerState("idle");
           }
-        );
-        soundRef.current = sound;
+        });
+        
         setPlayerState("playing");
       } catch {
         setPlayerState("idle");
@@ -221,11 +220,11 @@ export default function AudioPlayer({
       loadAndPlay(currentIndex);
     } else if (playerState === "playing") {
       if (Platform.OS === "web") await webAudio?.pause();
-      else await soundRef.current?.pauseAsync();
+      else playerRef.current?.pause();
       setPlayerState("paused");
     } else if (playerState === "paused") {
       if (Platform.OS === "web") await webAudio?.play();
-      else await soundRef.current?.playAsync();
+      else playerRef.current?.play();
       setPlayerState("playing");
     }
   };
@@ -248,7 +247,10 @@ export default function AudioPlayer({
     setShowReciters(false);
     const wasPlaying = playerState === "playing";
     if (Platform.OS === "web") { webAudio?.stop(); }
-    else if (soundRef.current) { await soundRef.current.unloadAsync(); soundRef.current = null; }
+    else if (playerRef.current) { 
+      playerRef.current.pause(); 
+      playerRef.current = null; 
+    }
     setPlayerState("idle");
     setPosition(0);
     setDuration(0);
@@ -258,8 +260,11 @@ export default function AudioPlayer({
   };
 
   const fmt = (ms: number) => {
+    if (isNaN(ms) || !isFinite(ms) || ms < 0) return "0:00";
     const s = Math.floor(ms / 1000);
-    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+    const mins = Math.floor(s / 60);
+    const secs = s % 60;
+    return `${mins}:${String(secs).padStart(2, "0")}`;
   };
 
   const isPlaying = playerState === "playing";

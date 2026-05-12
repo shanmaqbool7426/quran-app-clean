@@ -151,28 +151,37 @@ export default function LearnScreen() {
           </View> */}
 
           <View style={styles.featureRow}>
-            {LEARN_FEATURE_CARDS.map((card) => (
-              <TouchableOpacity
-                key={card.id}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  router.push(card.href);
-                }}
-                activeOpacity={0.85}
-                style={{ flex: 1 }}
-                accessibilityRole="button"
-                accessibilityLabel={card.a11yLabel}
-              >
-                <LinearGradient
-                  colors={[...resolveLearnGradient(card.gradient, colors.primary, colors.primaryLight)]}
-                  style={[styles.halfCard, { borderRadius: colors.radius }]}
+            {LEARN_FEATURE_CARDS.map((card) => {
+              const isComingSoon = card.id === "recitation";
+              return (
+                <TouchableOpacity
+                  key={card.id}
+                  onPress={() => {
+                    if (isComingSoon) return;
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    router.push(card.href);
+                  }}
+                  activeOpacity={isComingSoon ? 1 : 0.85}
+                  style={{ flex: 1 }}
+                  accessibilityRole="button"
+                  accessibilityLabel={card.a11yLabel}
                 >
-                  <Feather name={card.icon} size={28} color="#FFFFFF" />
-                  <Text style={styles.halfTitle}>{card.title}</Text>
-                  <Text style={styles.halfSub}>{card.subtitle}</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            ))}
+                  <LinearGradient
+                    colors={[...resolveLearnGradient(card.gradient, colors.primary, colors.primaryLight)]}
+                    style={[styles.halfCard, { borderRadius: colors.radius, opacity: isComingSoon ? 0.55 : 1 }]}
+                  >
+                    <Feather name={card.icon} size={28} color="#FFFFFF" />
+                    <Text style={styles.halfTitle}>{card.title}</Text>
+                    <Text style={styles.halfSub}>{card.subtitle}</Text>
+                    {isComingSoon && (
+                      <View style={styles.comingSoonBadge}>
+                        <Text style={styles.comingSoonText}>Coming Soon</Text>
+                      </View>
+                    )}
+                  </LinearGradient>
+                </TouchableOpacity>
+              );
+            })}
           </View>
 
           <View style={styles.section}>
@@ -357,6 +366,21 @@ const styles = StyleSheet.create({
   halfCard: { padding: 20, alignItems: "center", gap: 10 },
   halfTitle: { fontSize: 16, fontFamily: "Inter_700Bold", color: "#FFFFFF" },
   halfSub: { fontSize: 12, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.8)", textAlign: "center" },
+  comingSoonBadge: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    backgroundColor: "rgba(0,0,0,0.3)",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  comingSoonText: {
+    color: "#FFFFFF",
+    fontSize: 9,
+    fontFamily: "Inter_700Bold",
+    textTransform: "uppercase",
+  },
   section: { gap: 10 },
   sectionRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   sectionTitle: { fontSize: 17, fontFamily: "Inter_700Bold" },

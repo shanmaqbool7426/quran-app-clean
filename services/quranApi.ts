@@ -1,3 +1,5 @@
+import { getCachedSurah, getLocalAudioUri, saveSurahToCache } from "./offlineService";
+
 const BASE = "https://api.alquran.cloud/v1";
 export const AUDIO_CDN = "https://cdn.islamic.network/quran/audio/128";
 export const WORD_AUDIO_CDN = "https://audio.qurancdn.com/";
@@ -221,12 +223,30 @@ export async function fetchSurahDetail(
   reciterEdition: string = "ar.alafasy",
   translationEdition: string = "en.asad"
 ): Promise<SurahDetail> {
+  // 1. Try Offline Cache first
+  const cached = await getCachedSurah(surahId, reciterEdition, translationEdition);
+  if (cached) {
+    console.log(`[QuranApi] Loaded Surah ${surahId} from Offline Cache`);
+    
+    // Check if we have local audio files for these ayahs
+    const mappedAudio = await Promise.all(cached.audioAyahs.map(async (ayah) => {
+      if (ayah.audio) {
+        const local = await getLocalAudioUri(ayah.audio);
+        if (local) return { ...ayah, audio: local };
+      }
+      return ayah;
+    }));
+
+    return { ...cached, audioAyahs: mappedAudio };
+  }
+
+  // 2. Fetch from Network if not cached
   const editions = `quran-simple,${translationEdition},${reciterEdition}`;
   const data = await get<
     Array<{ number: number; name: string; englishName: string; englishNameTranslation: string; numberOfAyahs: number; revelationType: string; ayahs: ApiAyah[] }>
   >(`/surah/${surahId}/editions/${editions}`);
 
-  return {
+  const surahDetail: SurahDetail = {
     surah: {
       number: data[0].number,
       name: data[0].name,
@@ -239,6 +259,11 @@ export async function fetchSurahDetail(
     translationAyahs: data[1].ayahs,
     audioAyahs: data[2].ayahs,
   };
+
+  // 3. Save to Cache for next time
+  await saveSurahToCache(surahId, reciterEdition, translationEdition, surahDetail);
+  
+  return surahDetail;
 }
 
 export async function fetchWordByWord(surahId: number, ayahNumber: number): Promise<WordByWord[]> {

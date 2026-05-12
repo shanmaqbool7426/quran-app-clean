@@ -15,9 +15,9 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Animated, { 
-  FadeInDown, 
-  Layout, 
+import Animated, {
+  FadeInDown,
+  Layout,
   FadeIn,
   FadeOut
 } from "react-native-reanimated";
@@ -85,7 +85,7 @@ export default function AIChatScreen() {
   useEffect(() => {
     messagesRef.current = messages;
     if (messages.length > 1) {
-      AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(messages)).catch(() => {});
+      AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(messages)).catch(() => { });
     }
   }, [messages]);
 
@@ -120,13 +120,13 @@ export default function AIChatScreen() {
     };
 
     const historyMessages: ChatMessage[] = messagesRef.current
-      .filter((m) => 
-        m.id !== "welcome" && 
+      .filter((m) =>
+        m.id !== "welcome" &&
         !m.content.includes("I encountered an error") &&
         m.content.trim() !== ""
       )
       .map((m) => ({ role: m.role, content: m.content }));
-    
+
     historyMessages.push({ role: "user", content: trimmed });
 
     setInput("");
@@ -157,10 +157,10 @@ export default function AIChatScreen() {
             prev.map((m) =>
               m.id === assistantId
                 ? {
-                    ...m,
-                    content: m.content || "I encountered an error. Please try again.",
-                    isLoading: false,
-                  }
+                  ...m,
+                  content: m.content || "I encountered an error. Please try again.",
+                  isLoading: false,
+                }
                 : m
             )
           );
@@ -188,7 +188,7 @@ export default function AIChatScreen() {
     if (initialPromptConsumed.current) return;
     if (typeof initialPrompt !== "string" || !initialPrompt.trim()) return;
     initialPromptConsumed.current = true;
-    
+
     const timer = setTimeout(() => {
       void sendMessage(decodeURIComponent(initialPrompt));
     }, 500);
@@ -200,10 +200,10 @@ export default function AIChatScreen() {
     const showAvatar = index === 0 || messages[index - 1].role !== item.role;
 
     return (
-      <Animated.View 
+      <Animated.View
         entering={FadeInDown.duration(400).springify().damping(20)}
         style={[
-          styles.messageRow, 
+          styles.messageRow,
           isUser && styles.messageRowUser,
           !showAvatar && { marginBottom: 2 }
         ]}
@@ -213,7 +213,7 @@ export default function AIChatScreen() {
             <Feather name="cpu" size={14} color="#FFFFFF" />
           </View>
         )}
-        
+
         <View
           style={[
             styles.bubble,
@@ -252,7 +252,7 @@ export default function AIChatScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Feather name="chevron-left" size={24} color="#FFFFFF" />
         </TouchableOpacity>
-        
+
         <View style={styles.headerCenter}>
           <View style={styles.headerIconWrap}>
             <Feather name="cpu" size={18} color="#FFFFFF" />
@@ -260,13 +260,13 @@ export default function AIChatScreen() {
           <View>
             <Text style={styles.headerTitle}>AI Islamic Scholar</Text>
             <View style={styles.statusRow}>
-              <View style={[
-                styles.statusDot, 
+              {/* <View style={[
+                styles.statusDot,
                 { backgroundColor: connectionStatus === "ok" ? "#34D399" : connectionStatus === "error" ? "#F87171" : "#FBBF24" }
-              ]} />
-              <Text style={styles.headerSub}>
+              ]} /> */}
+              {/* <Text style={styles.headerSub}>
                 {connectionStatus === "ok" ? "Backend Connected" : connectionStatus === "error" ? "Connection Error" : "Testing Connection..."}
-              </Text>
+              </Text> */}
             </View>
           </View>
         </View>
@@ -323,7 +323,7 @@ export default function AIChatScreen() {
           }
         />
 
-        <Animated.View 
+        <Animated.View
           layout={Layout.springify()}
           style={[
             styles.inputBar,
@@ -346,8 +346,8 @@ export default function AIChatScreen() {
           />
           <TouchableOpacity
             style={[
-              styles.sendBtn, 
-              { 
+              styles.sendBtn,
+              {
                 backgroundColor: input.trim() && !isStreaming ? "#8B5CF6" : colors.muted,
                 opacity: input.trim() || isStreaming ? 1 : 0.6
               }
@@ -369,11 +369,11 @@ export default function AIChatScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  header: { 
-    flexDirection: "row", 
-    alignItems: "center", 
-    paddingHorizontal: 16, 
-    paddingBottom: 16, 
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingBottom: 16,
     gap: 12,
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
@@ -390,13 +390,13 @@ const styles = StyleSheet.create({
   suggestions: { marginBottom: 24, gap: 12 },
   suggestTitle: { fontSize: 12, fontFamily: "Inter_600SemiBold", marginLeft: 4, textTransform: "uppercase", letterSpacing: 0.5 },
   suggestionGrid: { gap: 8 },
-  suggestionChip: { 
-    padding: 14, 
-    borderRadius: 16, 
-    borderWidth: 1, 
-    flexDirection: "row", 
-    alignItems: "center", 
-    justifyContent: "space-between" 
+  suggestionChip: {
+    padding: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between"
   },
   suggestionText: { fontSize: 14, fontFamily: "Inter_500Medium", flex: 1, marginRight: 8 },
   messageRow: { flexDirection: "row", alignItems: "flex-end", gap: 8, marginBottom: 8 },
@@ -408,23 +408,23 @@ const styles = StyleSheet.create({
   bubbleText: { fontSize: 15, fontFamily: "Inter_400Regular", lineHeight: 24 },
   typingRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 4 },
   typingText: { fontSize: 14, fontFamily: "Inter_400Regular", fontStyle: "italic" },
-  inputBar: { 
-    borderTopWidth: 1, 
-    paddingTop: 12, 
-    paddingHorizontal: 16, 
-    flexDirection: "row", 
-    gap: 10, 
+  inputBar: {
+    borderTopWidth: 1,
+    paddingTop: 12,
+    paddingHorizontal: 16,
+    flexDirection: "row",
+    gap: 10,
     alignItems: "flex-end",
   },
-  input: { 
-    flex: 1, 
-    borderRadius: 24, 
-    paddingHorizontal: 18, 
-    paddingVertical: 12, 
-    fontSize: 15, 
-    fontFamily: "Inter_400Regular", 
-    borderWidth: 1, 
-    maxHeight: 120 
+  input: {
+    flex: 1,
+    borderRadius: 24,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    fontSize: 15,
+    fontFamily: "Inter_400Regular",
+    borderWidth: 1,
+    maxHeight: 120
   },
   sendBtn: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
 });

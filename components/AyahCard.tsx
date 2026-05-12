@@ -106,8 +106,13 @@ export default function AyahCard({
     const scholar = SCHOLAR_TAFSEERS.find(s => s.id === scholarId);
     try {
       const result = await fetchTafseer(
-        surahId, surahName, ayah.number, ayah.arabic, ayah.translation,
-        scholar?.langCode === "ar" ? "Arabic" : "English", scholar?.fullName
+        surahId, 
+        surahName, 
+        ayah.number, 
+        ayah.arabic, 
+        ayah.translation,
+        scholar?.language ?? "English", 
+        scholar?.fullName
       );
       setScholarTafseer(result.tafseer);
     } catch {
@@ -180,6 +185,7 @@ export default function AyahCard({
                   onPlayPress();
                 }}
                 style={[styles.actionBtn, { backgroundColor: isPlaying ? colors.primary : colors.muted }]}
+                accessibilityLabel="Play Ayah"
               >
                 {isLoading ? (
                   <ActivityIndicator size={13} color={isPlaying ? "#FFFFFF" : colors.primary} />
@@ -191,9 +197,11 @@ export default function AyahCard({
 
             <TouchableOpacity
               onPress={handleTafseer}
-              style={[styles.iconBtn, { backgroundColor: "#8B5CF615", borderRadius: 10 }]}
+              style={[styles.tafseerBtn, { backgroundColor: "#8B5CF615", borderColor: "#8B5CF630" }]}
+              accessibilityLabel="View Tafseer"
             >
-              <Feather name="book" size={13} color="#8B5CF6" />
+              <Feather name="book-open" size={11} color="#8B5CF6" />
+              <Text style={styles.tafseerBtnText}>Tafseer</Text>
             </TouchableOpacity>
 
             <TouchableOpacity onPress={handleBookmark} style={styles.iconBtn}>
@@ -257,9 +265,9 @@ export default function AyahCard({
 
         {/* ── Translation ── */}
         {showTranslation && (
-          <View style={styles.translationWrap}>
-            <View style={[styles.translationAccent, { backgroundColor: colors.primary + "30" }]} />
-            <Text style={[styles.translation, { color: colors.mutedForeground }]}>
+          <View style={[styles.translationWrap, { backgroundColor: isPlaying ? colors.primary + "10" : colors.muted + "40" }]}>
+            <View style={[styles.translationAccent, { backgroundColor: colors.primary }]} />
+            <Text style={[styles.translation, { color: colors.foreground, fontSize: Math.max(14, fontSize - 8) }]}>
               {ayah.translation}
             </Text>
           </View>
@@ -470,8 +478,22 @@ const styles = StyleSheet.create({
   ayahNum: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
   ayahNumText: { fontSize: 13, fontFamily: "Inter_700Bold" },
   actions: { flexDirection: "row", gap: 4, alignItems: "center" },
-  actionBtn: { width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center" },
-  iconBtn: { width: 28, height: 28, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  actionBtn: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center" },
+  tafseerBtn: { 
+    flexDirection: "row", 
+    alignItems: "center", 
+    gap: 5, 
+    paddingHorizontal: 10, 
+    paddingVertical: 6, 
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  tafseerBtnText: { 
+    fontSize: 11, 
+    fontFamily: "Inter_600SemiBold", 
+    color: "#8B5CF6" 
+  },
+  iconBtn: { width: 32, height: 32, borderRadius: 10, alignItems: "center", justifyContent: "center" },
   arabic: { textAlign: "right", lineHeight: 48, fontWeight: "400", writingDirection: "rtl", marginBottom: 2, letterSpacing: 0.5 },
   hifzContainer: { borderWidth: 1, borderRadius: 12, padding: 12, marginTop: 4, marginBottom: 4, gap: 10 },
   wbwContainer: { borderWidth: 1, borderRadius: 12, padding: 12, marginTop: 8, gap: 10 },
@@ -480,21 +502,40 @@ const styles = StyleSheet.create({
   wbwBadgeText: { fontSize: 10, fontFamily: "Inter_600SemiBold" },
   wbwClose: { padding: 4 },
   transliteration: { fontSize: 12, fontFamily: "Inter_400Regular", fontStyle: "italic", marginBottom: 6, lineHeight: 18 },
-  translationWrap: { flexDirection: "row", gap: 8 },
-  translationAccent: { width: 3, borderRadius: 2, marginTop: 2 },
-  translation: { flex: 1, fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 20 },
+  translationWrap: { 
+    flexDirection: "row", 
+    gap: 12, 
+    padding: 12, 
+    borderRadius: 12, 
+    marginTop: 8 
+  },
+  translationAccent: { width: 4, borderRadius: 2 },
+  translation: { 
+    flex: 1, 
+    fontFamily: "Inter_500Medium", 
+    lineHeight: 24 
+  },
 
   // Modal
-  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
-  modalSheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, maxHeight: "92%", minHeight: "65%" },
+  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)", justifyContent: "flex-end" },
+  modalSheet: { 
+    borderTopLeftRadius: 32, 
+    borderTopRightRadius: 32, 
+    height: "94%",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 25,
+  },
   modalHandle: { width: 40, height: 4, borderRadius: 2, alignSelf: "center", marginTop: 12, marginBottom: 8 },
   modalHeader: { paddingHorizontal: 20, paddingBottom: 10, gap: 4 },
   modalTitleRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   modalTitleText: { fontSize: 18, fontFamily: "Inter_700Bold" },
   modalRef: { fontSize: 13, fontFamily: "Inter_400Regular" },
-  modalAyahBox: { marginHorizontal: 20, marginBottom: 12, padding: 14, borderRadius: 14, borderWidth: 1, gap: 6 },
-  modalArabic: { fontSize: 18, textAlign: "right", lineHeight: 34, fontWeight: "400", writingDirection: "rtl" },
-  modalTranslation: { fontSize: 12, fontFamily: "Inter_400Regular", lineHeight: 18, fontStyle: "italic" },
+  modalAyahBox: { marginHorizontal: 20, marginBottom: 12, padding: 16, borderRadius: 16, borderWidth: 1, gap: 8 },
+  modalArabic: { fontSize: 20, textAlign: "right", lineHeight: 38, fontWeight: "400", writingDirection: "rtl" },
+  modalTranslation: { fontSize: 14, fontFamily: "Inter_400Regular", lineHeight: 22, fontStyle: "italic" },
 
   // Source tabs
   sourceTabs: {
@@ -564,8 +605,18 @@ const styles = StyleSheet.create({
   tafseerSourceFlag: { fontSize: 14 },
   eraBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 },
   eraText: { fontSize: 10, fontFamily: "Inter_400Regular" },
-  tafseerContent: { padding: 16, borderRadius: 16, borderWidth: 1 },
-  tafseerText: { fontSize: 14, fontFamily: "Inter_400Regular", lineHeight: 24 },
+  tafseerContent: { 
+    padding: 20, 
+    borderRadius: 20, 
+    borderWidth: 1,
+    lineHeight: 28,
+  },
+  tafseerText: { 
+    fontSize: 16, 
+    fontFamily: "Inter_400Regular", 
+    lineHeight: 28,
+    letterSpacing: 0.3,
+  },
   refreshTafseer: {
     flexDirection: "row",
     alignItems: "center",

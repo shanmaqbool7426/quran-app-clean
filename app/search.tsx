@@ -12,6 +12,8 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { FlashList as ShopifyFlashList, ListRenderItemInfo } from "@shopify/flash-list";
+const TypedFlashList = ShopifyFlashList as any;
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
@@ -184,7 +186,10 @@ export default function SearchScreen() {
                   borderColor: selectedLang === item.edition ? colors.primary : colors.border,
                 },
               ]}
-              onPress={() => handleLangChange(item.edition)}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                handleLangChange(item.edition);
+              }}
             >
               <Text style={styles.langFlag}>{item.flag}</Text>
               <Text style={[styles.langChipText, { color: selectedLang === item.edition ? colors.primary : colors.mutedForeground }]}>
@@ -210,9 +215,11 @@ export default function SearchScreen() {
           </Text>
         </View>
       ) : results.length > 0 ? (
-        <FlatList
+        // @ts-ignore
+        <TypedFlashList
           data={results}
-          keyExtractor={(item, idx) => `${item.surahNumber}:${item.ayahNumber}:${idx}`}
+          keyExtractor={(item: any, idx: number) => `${item.surahNumber}:${item.ayahNumber}:${idx}`}
+          estimatedItemSize={120}
           contentContainerStyle={[styles.listContent, { paddingBottom: Platform.OS === "web" ? 40 : insets.bottom + 30 }]}
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={
@@ -222,7 +229,7 @@ export default function SearchScreen() {
               </Text>
             </View>
           }
-          renderItem={({ item }) => (
+          renderItem={({ item }: any) => (
             <ResultCard item={item} query={query} colors={colors} />
           )}
         />
@@ -244,6 +251,7 @@ export default function SearchScreen() {
                   key={term}
                   style={[styles.popularChip, { backgroundColor: colors.secondary, borderColor: colors.border }]}
                   onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                     setQuery(term);
                     doSearch(term, selectedLang);
                   }}
