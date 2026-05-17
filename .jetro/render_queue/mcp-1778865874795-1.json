@@ -1,0 +1,19 @@
+{
+  "id": "mcp-1778865874795-1",
+  "type": "note",
+  "data": {
+    "markdown": "# Privacy Policy for ClapFind\n\n**Last Updated: May 15, 2026**\n\nThis Privacy Policy describes how ClapFind (\"we\", \"our\", or \"the app\") handles your information when you use our application.\n\n## 1. Information We Collect\nThe app is designed to help you find your phone by listening for claps. To do this, we require certain permissions:\n\n*   **Microphone Access**: We use the microphone to listen for claps. The audio processing happens in real-time on your device. **We do not record, store, or transmit any audio data to our servers.**\n*   **Camera/Flashlight**: We use the camera's flash to provide a visual alert when a clap is detected.\n*   **Vibration**: We use the vibrator to provide a tactile alert when a clap is detected.\n*   **Foreground Service**: We use a foreground service to ensure the app can listen for claps even when you are not actively using it.\n\n## 2. Data Security\nSince we do not collect or store any personal data or audio recordings, there is no risk of your data being leaked from our servers. All processing is strictly local to your device.\n\n## 3. Third-Party Services\nThe app does not use any third-party analytics or advertising SDKs that collect your data.\n\n## 4. Children's Privacy\nOur app does not collect any information from children under the age of 13.\n\n## 5. Changes to This Policy\nWe may update our Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy on this page.\n\n## 6. Contact Us\nIf you have any questions about this Privacy Policy, please contact us at:\nshanm.clapup@gmail.com\n",
+    "title": "Privacy Policy for ClapFind"
+  },
+  "position": {
+    "x": 400,
+    "y": 40
+  },
+  "size": {
+    "width": 340,
+    "height": 200
+  },
+  "config": {
+    "width": 340
+  }
+}

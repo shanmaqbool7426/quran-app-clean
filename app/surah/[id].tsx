@@ -441,6 +441,7 @@ export default function SurahScreen() {
           }
           renderItem={({ item: arabicAyah, index: idx }: ListRenderItemInfo<any>) => {
             const translationAyah = data.translationAyahs[idx];
+            const secondaryAyah = data.secondaryTranslationAyahs?.[idx];
             const audioAyah = data.audioAyahs[idx];
             const audioUrl =
               audioAyah?.audio ??
@@ -452,6 +453,7 @@ export default function SurahScreen() {
                   number: arabicAyah.numberInSurah,
                   arabic: arabicAyah.text,
                   translation: translationAyah?.text ?? "",
+                  secondaryTranslation: secondaryAyah?.text ?? "",
                   audioUrl,
                   globalNumber: arabicAyah.number,
                 }}

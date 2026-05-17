@@ -2,7 +2,7 @@
   "expo": {
     "name": "Quran AI - Learn & Recite",
     "slug": "quran-app",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "quran-app",
@@ -16,13 +16,20 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.quranai.app",
-      "buildNumber": "1"
+      "bundleIdentifier": "com.islamicai.quran",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSSpeechRecognitionUsageDescription": "Allow $(PRODUCT_NAME) to use speech recognition.",
+        "NSMicrophoneUsageDescription": "Allow $(PRODUCT_NAME) to use the microphone."
+      }
     },
     "android": {
-      "package": "com.quranai.app",
-      "versionCode": 1,
-      "permissions": ["android.permission.RECORD_AUDIO"],
+      "package": "com.islamicai.quran",
+      "versionCode": 3,
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/icon.png",
         "backgroundColor": "#0D5C3A"
@@ -51,6 +58,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "5d00cec7-d6b4-4386-bc1f-7b75d63a01c2"
+      }
     }
   }
 }

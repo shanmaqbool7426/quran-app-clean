@@ -112,6 +112,69 @@ export async function cancelDailyReminder(): Promise<void> {
   await Notifications.cancelAllScheduledNotificationsAsync();
 }
 
+export interface PrayerTime {
+  name: string;
+  arabicName: string;
+  hour: number;
+  minute: number;
+}
+
+/** Schedule a daily notification for each prayer, 5 min before the prayer time. */
+export async function schedulePrayerNotifications(
+  prayers: PrayerTime[]
+): Promise<boolean> {
+  if (Platform.OS === "web") return false;
+  if (!Device.isDevice) return false;
+
+  const Notifications = await loadNotifications();
+  if (!Notifications) return false;
+
+  const { status } = await Notifications.requestPermissionsAsync();
+  if (status !== "granted") return false;
+
+  // Cancel existing prayer notifications (keep other notifs)
+  const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+  for (const n of scheduled) {
+    if ((n.content.data as any)?.type === "prayer") {
+      await Notifications.cancelScheduledNotificationAsync(n.identifier);
+    }
+  }
+
+  // Schedule one daily notification per prayer (5 min early)
+  for (const prayer of prayers) {
+    let h = prayer.hour;
+    let m = prayer.minute - 5;
+    if (m < 0) { m += 60; h = (h - 1 + 24) % 24; }
+
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: `🕌 ${prayer.name} (${prayer.arabicName}) — in 5 min`,
+        body: `Time for ${prayer.name} prayer. May Allah accept your prayers.`,
+        sound: true,
+        data: { type: "prayer", prayer: prayer.name },
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DAILY,
+        hour: h,
+        minute: m,
+      },
+    });
+  }
+  return true;
+}
+
+export async function cancelPrayerNotifications(): Promise<void> {
+  if (Platform.OS === "web") return;
+  const Notifications = await loadNotifications();
+  if (!Notifications) return;
+  const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+  for (const n of scheduled) {
+    if ((n.content.data as any)?.type === "prayer") {
+      await Notifications.cancelScheduledNotificationAsync(n.identifier);
+    }
+  }
+}
+
 export async function sendTestNotification(
   notifTitle: string,
   notifBody: string

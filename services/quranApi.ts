@@ -25,6 +25,7 @@ export interface SurahDetail {
   surah: ApiSurah;
   arabicAyahs: ApiAyah[];
   translationAyahs: ApiAyah[];
+  secondaryTranslationAyahs?: ApiAyah[];
   audioAyahs: ApiAyah[];
 }
 
@@ -225,7 +226,7 @@ export async function fetchSurahDetail(
 ): Promise<SurahDetail> {
   // 1. Try Offline Cache first
   const cached = await getCachedSurah(surahId, reciterEdition, translationEdition);
-  if (cached) {
+  if (cached && cached.secondaryTranslationAyahs) {
     console.log(`[QuranApi] Loaded Surah ${surahId} from Offline Cache`);
     
     // Check if we have local audio files for these ayahs
@@ -241,7 +242,10 @@ export async function fetchSurahDetail(
   }
 
   // 2. Fetch from Network if not cached
-  const editions = `quran-simple,${translationEdition},${reciterEdition}`;
+  // Automatically fetch Urdu as secondary if primary is not Urdu. If primary is Urdu, fetch English as secondary.
+  const secondaryEdition = translationEdition.startsWith("ur.") ? "en.asad" : "ur.ahmedali";
+  const editions = `quran-simple,${translationEdition},${secondaryEdition},${reciterEdition}`;
+  
   const data = await get<
     Array<{ number: number; name: string; englishName: string; englishNameTranslation: string; numberOfAyahs: number; revelationType: string; ayahs: ApiAyah[] }>
   >(`/surah/${surahId}/editions/${editions}`);
@@ -257,7 +261,8 @@ export async function fetchSurahDetail(
     },
     arabicAyahs: data[0].ayahs,
     translationAyahs: data[1].ayahs,
-    audioAyahs: data[2].ayahs,
+    secondaryTranslationAyahs: data[2].ayahs,
+    audioAyahs: data[3].ayahs,
   };
 
   // 3. Save to Cache for next time

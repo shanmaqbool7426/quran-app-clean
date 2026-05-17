@@ -2,14 +2,21 @@ import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import React, { useMemo } from "react";
-import { Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import React, { useEffect, useMemo, useRef } from "react";
+import {
+  Animated,
+  Dimensions,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { QAIDA_LESSONS } from "@/constants/qaida";
 import {
-  AI_CHAT_SUGGESTED_QUESTIONS,
-  LEARN_AI_QUICK_PROMPTS,
   LEARN_FEATURE_CARDS,
   LEARN_HERO,
   LEARN_QAIDA_SECTION,
@@ -19,20 +26,28 @@ import { useApp } from "@/context/AppContext";
 import { useColors } from "@/hooks/useColors";
 import { useQaidaProgress } from "@/hooks/useQaidaProgress";
 
+const { width: SCREEN_W } = Dimensions.get("window");
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+function useEntry(delay = 0) {
+  const opacity = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(24)).current;
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(opacity, { toValue: 1, duration: 550, delay, useNativeDriver: true }),
+      Animated.timing(translateY, { toValue: 0, duration: 550, delay, useNativeDriver: true }),
+    ]).start();
+  }, []);
+  return { opacity, transform: [{ translateY }] };
+}
 
 export default function LearnScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { progress, hifzSessions } = useApp();
-  const {
-    completedCount,
-    totalLessons,
-    isLessonComplete,
-    isLessonUnlocked,
-    unlockHint,
-  } = useQaidaProgress();
+  const { completedCount, totalLessons, isLessonComplete, isLessonUnlocked, unlockHint } = useQaidaProgress();
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
+  const isDark = colors.background === "#0B1A2E";
 
   const nextLessonId = useMemo(() => {
     for (const l of QAIDA_LESSONS) {
@@ -42,289 +57,291 @@ export default function LearnScreen() {
   }, [isLessonUnlocked, isLessonComplete]);
 
   const headerSubtitle = useMemo(() => {
-    if (completedCount === 0) {
-      return "Start with Qaida lesson 1, quick questions below, or open the scholar.";
-    }
-    if (completedCount >= totalLessons) {
-      return "Qaida path complete — deepen with Quran, Hifz, and the scholar.";
-    }
-    return `${completedCount} of ${totalLessons} Qaida lessons done — tap your next lesson to continue.`;
+    if (completedCount === 0) return "Start your Islamic learning journey today.";
+    if (completedCount >= totalLessons) return "Qaida complete! Continue with Quran & Hifz.";
+    return `${completedCount} of ${totalLessons} Qaida lessons done — keep going!`;
   }, [completedCount, totalLessons]);
 
-  const completedSurahs = Object.values(progress.surahs).filter((s) => s.completed).length;
-  const startedSurahs = Object.values(progress.surahs).filter((s) => s.started).length;
-  const totalMinutes = progress.totalMinutes;
-
+  const completedSurahs = Object.values(progress.surahs).filter(s => s.completed).length;
+  const startedSurahs = Object.values(progress.surahs).filter(s => s.started).length;
   const practiceThisWeek = useMemo(() => {
     const cutoff = Date.now() - WEEK_MS;
-    return hifzSessions.filter((s) => s.timestamp >= cutoff).length;
+    return hifzSessions.filter(s => s.timestamp >= cutoff).length;
   }, [hifzSessions]);
 
-  const stats = useMemo(
-    () => [
-      { icon: "mic" as const, val: String(hifzSessions.length), lbl: "Hifz logs", color: "#8B5CF6" },
-      { icon: "clock" as const, val: String(totalMinutes), lbl: "Minutes", color: colors.primary },
-      { icon: "check-circle" as const, val: String(completedSurahs), lbl: "Surahs done", color: "#C8972A" },
-      { icon: "calendar" as const, val: String(practiceThisWeek), lbl: "This week", color: "#2563EB" },
-    ],
-    [hifzSessions.length, totalMinutes, completedSurahs, practiceThisWeek, colors.primary]
-  );
+  const stats = [
+    { icon: "mic" as const,         val: hifzSessions.length, lbl: "Hifz Logs",   bg: ["#7C3AED","#A855F7"] as [string,string] },
+    { icon: "clock" as const,        val: progress.totalMinutes, lbl: "Minutes",    bg: ["#0D5C3A","#10B981"] as [string,string] },
+    { icon: "check-circle" as const, val: completedSurahs,    lbl: "Surahs Done", bg: ["#D97706","#F59E0B"] as [string,string] },
+    { icon: "calendar" as const,     val: practiceThisWeek,   lbl: "This Week",   bg: ["#2563EB","#3B82F6"] as [string,string] },
+  ];
+
+  const qaidaPct = totalLessons ? Math.min(100, (completedCount / totalLessons) * 100) : 0;
+
+  // Animated XP bar for Qaida progress
+  const qaidaBarAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(qaidaBarAnim, { toValue: qaidaPct, duration: 1200, delay: 600, useNativeDriver: false }).start();
+  }, [qaidaPct]);
+
+  // Pulse for AI button
+  const aiPulse = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(aiPulse, { toValue: 1.06, duration: 1000, useNativeDriver: true }),
+        Animated.timing(aiPulse, { toValue: 1, duration: 1000, useNativeDriver: true }),
+      ])
+    ).start();
+  }, []);
+
+  const heroEntry = useEntry(0);
+  const featEntry = useEntry(120);
+  const qaidaEntry = useEntry(220);
+  const statsEntry = useEntry(340);
 
   return (
-    <View style={[styles.screen, { backgroundColor: colors.background }]}>
+    <View style={[styles.screen, { backgroundColor: isDark ? "#060E1A" : "#F0F7F2" }]}>
       <ScrollView
-        contentContainerStyle={{ paddingBottom: Platform.OS === "web" ? 34 + 84 : insets.bottom + 100 }}
+        contentContainerStyle={{ paddingBottom: Platform.OS === "web" ? 120 : insets.bottom + 110 }}
         showsVerticalScrollIndicator={false}
       >
-        <View style={[styles.header, { paddingTop: topPadding + 16, backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-          <Text style={[styles.title, { color: colors.foreground }]}>Learn</Text>
-          <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>{headerSubtitle}</Text>
-        </View>
+        {/* ── HEADER ── */}
+        <LinearGradient
+          colors={isDark ? ["#2D1B69","#1E0545","#0D1F3C"] : ["#4C1D95","#7C3AED","#0D5C3A"]}
+          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+          style={[styles.header, { paddingTop: topPadding + 20 }]}
+        >
+          {/* Decorative rings */}
+          {[...Array(4)].map((_, i) => (
+            <View key={i} style={[styles.ring, {
+              width: 80 + i * 50, height: 80 + i * 50,
+              borderRadius: (80 + i * 50) / 2,
+              top: -20, right: -10,
+              borderColor: `rgba(255,255,255,${0.07 - i * 0.015})`,
+            }]} />
+          ))}
+          <Animated.View style={heroEntry}>
+            <View style={styles.headerBadge}>
+              <Feather name="book-open" size={11} color="#A78BFA" />
+              <Text style={styles.headerBadgeText}>LEARNING CENTER</Text>
+            </View>
+            <Text style={styles.headerTitle}>Learn & Grow</Text>
+            <Text style={styles.headerSub}>{headerSubtitle}</Text>
+          </Animated.View>
+        </LinearGradient>
 
         <View style={styles.content}>
-          <TouchableOpacity
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              router.push(LEARN_HERO.href);
-            }}
-            activeOpacity={0.85}
-            accessibilityRole="button"
-            accessibilityLabel="Open AI Islamic Scholar chat"
-          >
-            <LinearGradient
-              colors={[...resolveLearnGradient(LEARN_HERO.gradient, colors.primary, colors.primaryLight)]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={[styles.heroCard, { borderRadius: colors.radius }]}
+          {/* ── AI HERO CARD ── */}
+          <Animated.View style={heroEntry}>
+            <TouchableOpacity
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push(LEARN_HERO.href); }}
+              activeOpacity={0.85}
             >
-              <View style={styles.heroLeft}>
-                <View style={styles.heroBadge}>
-                  <Feather name="cpu" size={12} color="#8B5CF6" />
-                  <Text style={styles.heroBadgeText}>{LEARN_HERO.badge}</Text>
-                </View>
-                <Text style={styles.heroTitle}>{LEARN_HERO.title}</Text>
-                <Text style={styles.heroSub}>{LEARN_HERO.subtitle}</Text>
-                <View style={styles.heroBtn}>
-                  <Text style={styles.heroBtnText}>{LEARN_HERO.cta}</Text>
-                  <Feather name="arrow-right" size={14} color="#8B5CF6" />
-                </View>
-              </View>
-              <View style={styles.heroRight}>
-                <View style={[styles.waveCircle, { width: 80, height: 80 }]}>
-                  <Feather name="message-circle" size={36} color="rgba(255,255,255,0.9)" />
-                </View>
-              </View>
-            </LinearGradient>
-          </TouchableOpacity>
-
-          {/* <View style={styles.quickSection}>
-            <Text style={[styles.quickSectionLabel, { color: colors.foreground }]}>Ask the scholar</Text>
-            <Text style={[styles.quickSectionSub, { color: colors.mutedForeground }]}>
-              Opens chat with your question ({AI_CHAT_SUGGESTED_QUESTIONS.length} suggestions in chat).
-            </Text>
-            <ScrollView
-              horizontal
-              nestedScrollEnabled
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.quickChipsRow}
-            >
-              {LEARN_AI_QUICK_PROMPTS.map((q, i) => (
-                <TouchableOpacity
-                  key={i}
-                  style={[styles.quickChip, { backgroundColor: colors.card, borderColor: colors.border }]}
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    router.push({
-                      pathname: "/ai-chat",
-                      params: { prompt: encodeURIComponent(q) },
-                    });
-                  }}
-                  activeOpacity={0.75}
-                >
-                  <Feather name="message-circle" size={14} color={colors.primary} />
-                  <Text style={[styles.quickChipText, { color: colors.foreground }]} numberOfLines={3}>
-                    {q}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View> */}
-
-          <View style={styles.featureRow}>
-            {LEARN_FEATURE_CARDS.map((card) => {
-              const isComingSoon = card.id === "recitation";
-              return (
-                <TouchableOpacity
-                  key={card.id}
-                  onPress={() => {
-                    if (isComingSoon) return;
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    router.push(card.href);
-                  }}
-                  activeOpacity={isComingSoon ? 1 : 0.85}
-                  style={{ flex: 1 }}
-                  accessibilityRole="button"
-                  accessibilityLabel={card.a11yLabel}
-                >
-                  <LinearGradient
-                    colors={[...resolveLearnGradient(card.gradient, colors.primary, colors.primaryLight)]}
-                    style={[styles.halfCard, { borderRadius: colors.radius, opacity: isComingSoon ? 0.55 : 1 }]}
-                  >
-                    <Feather name={card.icon} size={28} color="#FFFFFF" />
-                    <Text style={styles.halfTitle}>{card.title}</Text>
-                    <Text style={styles.halfSub}>{card.subtitle}</Text>
-                    {isComingSoon && (
-                      <View style={styles.comingSoonBadge}>
-                        <Text style={styles.comingSoonText}>Coming Soon</Text>
-                      </View>
-                    )}
-                  </LinearGradient>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-
-          <View style={styles.section}>
-            <View style={styles.sectionRow}>
-              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>{LEARN_QAIDA_SECTION.title}</Text>
-              <TouchableOpacity
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  router.push(LEARN_QAIDA_SECTION.href);
-                }}
+              <LinearGradient
+                colors={["#1E0545","#3B0764","#4C1D95"]}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                style={styles.heroCard}
               >
-                <Text style={[styles.seeAll, { color: colors.primary }]}>{LEARN_QAIDA_SECTION.linkLabel}</Text>
+                {[...Array(3)].map((_, i) => (
+                  <View key={i} style={[styles.heroRing, {
+                    width: 70 + i * 45, height: 70 + i * 45,
+                    borderRadius: (70 + i * 45) / 2,
+                    right: -10, bottom: -10,
+                    borderColor: `rgba(168,85,247,${0.2 - i * 0.05})`,
+                  }]} />
+                ))}
+                <View style={styles.heroLeft}>
+                  <View style={styles.heroBadge}>
+                    <View style={styles.heroBadgeDot} />
+                    <Text style={styles.heroBadgeText}>AI POWERED • LIVE</Text>
+                  </View>
+                  <Text style={styles.heroTitle}>{LEARN_HERO.title}</Text>
+                  <Text style={styles.heroSub}>{LEARN_HERO.subtitle}</Text>
+                  <Animated.View style={{ transform: [{ scale: aiPulse }], alignSelf: "flex-start" }}>
+                    <View style={styles.heroBtn}>
+                      <Text style={styles.heroBtnText}>{LEARN_HERO.cta}</Text>
+                      <Feather name="arrow-right" size={13} color="#7C3AED" />
+                    </View>
+                  </Animated.View>
+                </View>
+                <LinearGradient colors={["#7C3AED","#A855F7"]} style={styles.heroIconCircle}>
+                  <Feather name="cpu" size={30} color="#FFFFFF" />
+                </LinearGradient>
+              </LinearGradient>
+            </TouchableOpacity>
+          </Animated.View>
+
+          {/* ── FEATURE CARDS ── */}
+          <Animated.View style={[styles.section, featEntry]}>
+            <Text style={[styles.sectionTitle, { color: isDark ? "#E2E8F0" : "#0A1E0F" }]}>📚 Learning Paths</Text>
+            <View style={styles.featureRow}>
+              {LEARN_FEATURE_CARDS.map((card, idx) => {
+                const isComingSoon = false; // recitation is now live
+                const gradColors = resolveLearnGradient(card.gradient, colors.primary, colors.primaryLight);
+                return (
+                  <TouchableOpacity
+                    key={card.id}
+                    onPress={() => {
+                      if (isComingSoon) return;
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      router.push(card.href);
+                    }}
+                    activeOpacity={isComingSoon ? 1 : 0.85}
+                    style={{ flex: 1 }}
+                  >
+                    <LinearGradient
+                      colors={[...gradColors] as [string, string]}
+                      style={[styles.halfCard, { opacity: isComingSoon ? 0.6 : 1 }]}
+                    >
+                      <View style={styles.halfIconBg}>
+                        <Feather name={card.icon} size={26} color="#FFFFFF" />
+                      </View>
+                      <Text style={styles.halfTitle}>{card.title}</Text>
+                      <Text style={styles.halfSub}>{card.subtitle}</Text>
+                      {isComingSoon && (
+                        <View style={styles.comingSoonBadge}>
+                          <Text style={styles.comingSoonText}>Soon</Text>
+                        </View>
+                      )}
+                    </LinearGradient>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </Animated.View>
+
+          {/* ── QAIDA PROGRESS ── */}
+          <Animated.View style={[styles.section, qaidaEntry]}>
+            <View style={styles.sectionRow}>
+              <Text style={[styles.sectionTitle, { color: isDark ? "#E2E8F0" : "#0A1E0F" }]}>🕌 Noorani Qaida</Text>
+              <TouchableOpacity onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push(LEARN_QAIDA_SECTION.href); }}>
+                <Text style={[styles.seeAll, { color: "#10B981" }]}>{LEARN_QAIDA_SECTION.linkLabel} →</Text>
               </TouchableOpacity>
             </View>
 
-            <View style={[styles.qaidaSummary, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
-              <View style={styles.qaidaSummaryTop}>
-                <Text style={[styles.qaidaSummaryLabel, { color: colors.mutedForeground }]}>Your progress</Text>
-                <Text style={[styles.qaidaSummaryVal, { color: colors.primary }]}>
-                  {completedCount}/{totalLessons} lessons
-                </Text>
+            {/* Progress bar card */}
+            <LinearGradient
+              colors={isDark ? ["#0F2335","#0D3B2A"] : ["#F0FAF5","#FFFFFF"]}
+              style={[styles.qaidaCard, { borderColor: isDark ? "#1E3050" : "#D4E8DC" }]}
+            >
+              <View style={styles.qaidaTop}>
+                <View>
+                  <Text style={[styles.qaidaLabel, { color: isDark ? "#94A3B8" : "#6B8C7A" }]}>Overall Progress</Text>
+                  <Text style={[styles.qaidaVal, { color: isDark ? "#F1F5F9" : "#0A1E0F" }]}>{completedCount}/{totalLessons} Lessons</Text>
+                </View>
+                <View style={[styles.qaidaPctBadge, { backgroundColor: "#10B98122" }]}>
+                  <Text style={[styles.qaidaPctText, { color: "#10B981" }]}>{Math.round(qaidaPct)}%</Text>
+                </View>
               </View>
-              <View style={[styles.qaidaTrack, { backgroundColor: colors.muted }]}>
-                <View
-                  style={[
-                    styles.qaidaFill,
-                    {
-                      backgroundColor: colors.primary,
-                      width: `${Math.min(100, totalLessons ? (completedCount / totalLessons) * 100 : 0)}%` as const,
-                    },
-                  ]}
-                />
+              <View style={[styles.qaidaBarBg, { backgroundColor: isDark ? "#1E3050" : "#E5F0EA" }]}>
+                <Animated.View style={{
+                  height: "100%", borderRadius: 4,
+                  width: qaidaBarAnim.interpolate({ inputRange: [0, 100], outputRange: ["0%", "100%"] }),
+                  backgroundColor: "#10B981",
+                }} />
               </View>
-              <Text style={[styles.qaidaHint, { color: colors.mutedForeground }]}>
-                {LEARN_QAIDA_SECTION.progressHint}
-              </Text>
-            </View>
+              <Text style={[styles.qaidaHint, { color: isDark ? "#64748B" : "#6B8C7A" }]}>{LEARN_QAIDA_SECTION.progressHint}</Text>
+            </LinearGradient>
 
+            {/* Lesson rows */}
             {QAIDA_LESSONS.map((lesson) => {
               const locked = !isLessonUnlocked(lesson.id);
               const done = isLessonComplete(lesson.id);
               const isNext = lesson.id === nextLessonId;
               const hint = unlockHint(lesson.id);
 
+              let badgeBg: [string, string] = done
+                ? ["#059669","#10B981"]
+                : locked
+                  ? [isDark ? "#1E2A3A" : "#E5F0EA", isDark ? "#1E2A3A" : "#E5F0EA"]
+                  : isNext
+                    ? ["#0D5C3A","#1A8A5A"]
+                    : ["#1E3050","#243B55"];
+
               return (
                 <TouchableOpacity
                   key={lesson.id}
                   style={[
                     styles.lessonRow,
-                    { backgroundColor: colors.card, borderColor: colors.border },
-                    locked && { opacity: 0.62 },
-                    isNext && !done && !locked && { borderColor: colors.primary, borderWidth: 1.5 },
+                    {
+                      backgroundColor: isDark ? "#0F1E30" : "#FFFFFF",
+                      borderColor: isNext && !done && !locked
+                        ? "#10B981"
+                        : isDark ? "#1E3050" : "#D4E8DC",
+                      borderWidth: isNext && !done && !locked ? 1.5 : 1,
+                      opacity: locked ? 0.6 : 1,
+                    },
                   ]}
                   onPress={() => {
-                    if (locked) {
-                      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-                      return;
-                    }
+                    if (locked) { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning); return; }
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                     router.push(`/lesson/${lesson.id}` as const);
                   }}
-                  activeOpacity={locked ? 1 : 0.72}
-                  accessibilityRole="button"
-                  accessibilityState={{ disabled: locked }}
-                  accessibilityLabel={
-                    locked
-                      ? `${lesson.title}, locked. ${hint ?? ""}`
-                      : done
-                        ? `${lesson.title}, completed`
-                        : `${lesson.title}, open lesson`
-                  }
+                  activeOpacity={locked ? 1 : 0.75}
                 >
-                  <View
-                    style={[
-                      styles.lessonNum,
-                      {
-                        backgroundColor: done
-                          ? "#10B98122"
-                          : locked
-                            ? colors.muted
-                            : colors.secondary,
-                      },
-                    ]}
-                  >
+                  <LinearGradient colors={badgeBg} style={styles.lessonNum}>
                     {done ? (
-                      <Feather name="check" size={16} color="#10B981" />
+                      <Feather name="check" size={15} color="#FFFFFF" />
                     ) : locked ? (
-                      <Feather name="lock" size={14} color={colors.mutedForeground} />
+                      <Feather name="lock" size={13} color={isDark ? "#64748B" : "#94A3B8"} />
                     ) : (
-                      <Text style={[styles.lessonNumText, { color: colors.primary }]}>{lesson.id}</Text>
+                      <Text style={styles.lessonNumText}>{lesson.id}</Text>
                     )}
-                  </View>
+                  </LinearGradient>
                   <View style={styles.lessonInfo}>
                     <View style={styles.lessonTitleRow}>
-                      <Text
-                        style={[
-                          styles.lessonTitle,
-                          { color: locked ? colors.mutedForeground : colors.foreground },
-                        ]}
-                      >
+                      <Text style={[styles.lessonTitle, { color: locked ? (isDark ? "#475569" : "#94A3B8") : (isDark ? "#F1F5F9" : "#0A1E0F") }]}>
                         {lesson.title}
                       </Text>
                       {isNext && !done && !locked && (
-                        <View style={[styles.nextPill, { backgroundColor: colors.primary + "18" }]}>
-                          <Text style={[styles.nextPillText, { color: colors.primary }]}>Next</Text>
+                        <View style={styles.nextPill}>
+                          <Text style={styles.nextPillText}>NEXT</Text>
+                        </View>
+                      )}
+                      {done && (
+                        <View style={styles.donePill}>
+                          <Text style={styles.donePillText}>DONE ✓</Text>
                         </View>
                       )}
                     </View>
-                    <Text style={[styles.lessonSub, { color: colors.mutedForeground }]}>{lesson.subtitle}</Text>
-                    {locked && hint ? (
-                      <Text style={[styles.lessonLockHint, { color: colors.mutedForeground }]}>{hint}</Text>
-                    ) : null}
+                    <Text style={[styles.lessonSub, { color: isDark ? "#64748B" : "#6B8C7A" }]}>{lesson.subtitle}</Text>
+                    {locked && hint && <Text style={[styles.lockHint, { color: isDark ? "#475569" : "#94A3B8" }]}>{hint}</Text>}
                   </View>
                   {!locked && !done && (
-                    <View style={[styles.startBtn, { backgroundColor: colors.primary }]}>
+                    <LinearGradient colors={["#0D5C3A","#10B981"]} style={styles.playBtn}>
                       <Feather name="play" size={12} color="#FFFFFF" />
-                    </View>
+                    </LinearGradient>
                   )}
-                  {done && (
-                    <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
-                  )}
+                  {done && <Feather name="chevron-right" size={18} color={isDark ? "#475569" : "#94A3B8"} />}
                 </TouchableOpacity>
               );
             })}
-          </View>
+          </Animated.View>
 
-          <View style={[styles.statsCard, { backgroundColor: colors.card, borderColor: colors.border, borderRadius: colors.radius }]}>
-            <Text style={[styles.statsTitle, { color: colors.foreground }]}>Your activity</Text>
-            <Text style={[styles.statsHint, { color: colors.mutedForeground }]}>
-              {startedSurahs > 0
-                ? `${startedSurahs} surah${startedSurahs === 1 ? "" : "s"} in progress in the Quran tab`
-                : "Open a surah in the Quran tab to track reading progress"}
-            </Text>
+          {/* ── ACTIVITY STATS ── */}
+          <Animated.View style={[styles.section, statsEntry]}>
+            <Text style={[styles.sectionTitle, { color: isDark ? "#E2E8F0" : "#0A1E0F" }]}>📊 Your Activity</Text>
+            {startedSurahs > 0 && (
+              <View style={[styles.activityHint, { backgroundColor: isDark ? "#0F1E30" : "#F0FAF5", borderColor: isDark ? "#1E3050" : "#D4E8DC" }]}>
+                <Feather name="info" size={13} color="#10B981" />
+                <Text style={[styles.activityHintText, { color: isDark ? "#94A3B8" : "#6B8C7A" }]}>
+                  {startedSurahs} surah{startedSurahs > 1 ? "s" : ""} in progress in the Quran tab
+                </Text>
+              </View>
+            )}
             <View style={styles.statsGrid}>
-              {stats.map((stat) => (
-                <View key={stat.lbl} style={styles.statItem}>
-                  <Feather name={stat.icon} size={20} color={stat.color} />
-                  <Text style={[styles.statVal, { color: colors.foreground }]}>{stat.val}</Text>
-                  <Text style={[styles.statLbl, { color: colors.mutedForeground }]}>{stat.lbl}</Text>
+              {stats.map((stat, i) => (
+                <View key={stat.lbl} style={[styles.statCard, { backgroundColor: isDark ? "#0F1E30" : "#FFFFFF", borderColor: isDark ? "#1E3050" : "#D4E8DC" }]}>
+                  <LinearGradient colors={stat.bg} style={styles.statIcon}>
+                    <Feather name={stat.icon} size={16} color="#FFFFFF" />
+                  </LinearGradient>
+                  <Text style={[styles.statVal, { color: isDark ? "#F1F5F9" : "#0A1E0F" }]}>{stat.val}</Text>
+                  <Text style={[styles.statLbl, { color: stat.bg[0] }]}>{stat.lbl}</Text>
                 </View>
               ))}
             </View>
-          </View>
+          </Animated.View>
         </View>
       </ScrollView>
     </View>
@@ -333,86 +350,74 @@ export default function LearnScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  header: { paddingHorizontal: 20, paddingBottom: 16, borderBottomWidth: 1 },
-  title: { fontSize: 26, fontFamily: "Inter_700Bold" },
-  subtitle: { fontSize: 13, fontFamily: "Inter_400Regular", marginTop: 2 },
-  content: { padding: 20, gap: 16 },
-  quickSection: { gap: 8 },
-  quickSectionLabel: { fontSize: 15, fontFamily: "Inter_700Bold" },
-  quickSectionSub: { fontSize: 12, fontFamily: "Inter_400Regular", lineHeight: 17 },
-  quickChipsRow: { flexDirection: "row", gap: 10, paddingVertical: 4, paddingRight: 4 },
-  quickChip: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 8,
-    maxWidth: 220,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  quickChipText: { flex: 1, fontSize: 12, fontFamily: "Inter_500Medium", lineHeight: 17 },
-  heroCard: { padding: 24, flexDirection: "row", justifyContent: "space-between", alignItems: "center", overflow: "hidden" },
-  heroLeft: { flex: 1, gap: 10 },
-  heroBadge: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#FFFFFF", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, alignSelf: "flex-start" },
-  heroBadgeText: { fontSize: 10, fontFamily: "Inter_700Bold", color: "#8B5CF6", letterSpacing: 1 },
-  heroTitle: { fontSize: 20, fontFamily: "Inter_700Bold", color: "#FFFFFF" },
-  heroSub: { fontSize: 13, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.85)", lineHeight: 20 },
-  heroBtn: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#FFFFFF", paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, alignSelf: "flex-start" },
-  heroBtnText: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#8B5CF6" },
-  heroRight: { marginLeft: 16 },
-  waveCircle: { borderRadius: 50, backgroundColor: "rgba(255,255,255,0.15)", alignItems: "center", justifyContent: "center" },
-  featureRow: { flexDirection: "row", gap: 12 },
-  halfCard: { padding: 20, alignItems: "center", gap: 10 },
-  halfTitle: { fontSize: 16, fontFamily: "Inter_700Bold", color: "#FFFFFF" },
-  halfSub: { fontSize: 12, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.8)", textAlign: "center" },
-  comingSoonBadge: {
-    position: "absolute",
-    top: 10,
-    right: 10,
-    backgroundColor: "rgba(0,0,0,0.3)",
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
-  },
-  comingSoonText: {
-    color: "#FFFFFF",
-    fontSize: 9,
-    fontFamily: "Inter_700Bold",
-    textTransform: "uppercase",
-  },
-  section: { gap: 10 },
+
+  /* Header */
+  header: { paddingHorizontal: 20, paddingBottom: 28, overflow: "hidden", position: "relative" },
+  ring: { position: "absolute", borderWidth: 1 },
+  headerBadge: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "rgba(255,255,255,0.12)", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, alignSelf: "flex-start", marginBottom: 8 },
+  headerBadgeText: { color: "#A78BFA", fontSize: 10, fontFamily: "Inter_700Bold", letterSpacing: 1 },
+  headerTitle: { fontSize: 28, fontFamily: "Inter_700Bold", color: "#FFFFFF", letterSpacing: -0.5 },
+  headerSub: { fontSize: 13, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.65)", marginTop: 5, lineHeight: 20 },
+
+  content: { padding: 16, gap: 24 },
+  section: { gap: 12 },
   sectionRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   sectionTitle: { fontSize: 17, fontFamily: "Inter_700Bold" },
-  seeAll: { fontSize: 13, fontFamily: "Inter_500Medium" },
-  lessonRow: { flexDirection: "row", alignItems: "center", gap: 14, padding: 14, borderRadius: 14, borderWidth: 1 },
-  lessonNum: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
-  lessonNumText: { fontSize: 14, fontFamily: "Inter_700Bold" },
-  lessonInfo: { flex: 1 },
-  lessonTitle: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
-  lessonSub: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2 },
-  startBtn: { width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center" },
-  statsCard: { padding: 20, borderWidth: 1 },
-  statsTitle: { fontSize: 16, fontFamily: "Inter_700Bold", marginBottom: 6 },
-  statsHint: { fontSize: 12, fontFamily: "Inter_400Regular", lineHeight: 18, marginBottom: 14 },
-  statsGrid: { flexDirection: "row", justifyContent: "space-around" },
-  statItem: { alignItems: "center", gap: 6 },
-  statVal: { fontSize: 20, fontFamily: "Inter_700Bold" },
-  statLbl: { fontSize: 11, fontFamily: "Inter_400Regular" },
-  qaidaSummary: {
-    borderRadius: 14,
-    borderWidth: 1,
-    padding: 14,
-    gap: 10,
-  },
-  qaidaSummaryTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  qaidaSummaryLabel: { fontSize: 12, fontFamily: "Inter_500Medium" },
-  qaidaSummaryVal: { fontSize: 13, fontFamily: "Inter_700Bold" },
-  qaidaTrack: { height: 6, borderRadius: 4, overflow: "hidden" },
-  qaidaFill: { height: "100%", borderRadius: 4 },
+  seeAll: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+
+  /* Hero card */
+  heroCard: { borderRadius: 22, padding: 22, flexDirection: "row", alignItems: "center", gap: 16, overflow: "hidden" },
+  heroRing: { position: "absolute", borderWidth: 1 },
+  heroLeft: { flex: 1, gap: 10 },
+  heroBadge: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(168,85,247,0.25)", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, alignSelf: "flex-start" },
+  heroBadgeDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#A855F7" },
+  heroBadgeText: { fontSize: 9, fontFamily: "Inter_700Bold", color: "#C4B5FD", letterSpacing: 1 },
+  heroTitle: { fontSize: 19, fontFamily: "Inter_700Bold", color: "#FFFFFF" },
+  heroSub: { fontSize: 12, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.75)", lineHeight: 18 },
+  heroBtn: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#FFFFFF", paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, alignSelf: "flex-start" },
+  heroBtnText: { fontSize: 12, fontFamily: "Inter_700Bold", color: "#7C3AED" },
+  heroIconCircle: { width: 60, height: 60, borderRadius: 20, alignItems: "center", justifyContent: "center", flexShrink: 0 },
+
+  /* Feature row */
+  featureRow: { flexDirection: "row", gap: 12 },
+  halfCard: { borderRadius: 20, padding: 18, alignItems: "center", gap: 10, overflow: "hidden" },
+  halfIconBg: { width: 50, height: 50, borderRadius: 16, backgroundColor: "rgba(255,255,255,0.2)", alignItems: "center", justifyContent: "center" },
+  halfTitle: { fontSize: 15, fontFamily: "Inter_700Bold", color: "#FFFFFF" },
+  halfSub: { fontSize: 11, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.8)", textAlign: "center", lineHeight: 16 },
+  comingSoonBadge: { position: "absolute", top: 10, right: 10, backgroundColor: "rgba(0,0,0,0.35)", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 },
+  comingSoonText: { color: "#FFFFFF", fontSize: 9, fontFamily: "Inter_700Bold" },
+
+  /* Qaida */
+  qaidaCard: { borderRadius: 18, borderWidth: 1, padding: 16, gap: 10 },
+  qaidaTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  qaidaLabel: { fontSize: 11, fontFamily: "Inter_500Medium" },
+  qaidaVal: { fontSize: 16, fontFamily: "Inter_700Bold", marginTop: 2 },
+  qaidaPctBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
+  qaidaPctText: { fontSize: 14, fontFamily: "Inter_700Bold" },
+  qaidaBarBg: { height: 6, borderRadius: 4, overflow: "hidden" },
   qaidaHint: { fontSize: 11, fontFamily: "Inter_400Regular", lineHeight: 16 },
+
+  /* Lesson rows */
+  lessonRow: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14, borderRadius: 16, borderWidth: 1 },
+  lessonNum: { width: 38, height: 38, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  lessonNumText: { fontSize: 14, fontFamily: "Inter_700Bold", color: "#FFFFFF" },
+  lessonInfo: { flex: 1 },
   lessonTitleRow: { flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" },
-  nextPill: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8 },
-  nextPillText: { fontSize: 10, fontFamily: "Inter_700Bold", textTransform: "uppercase", letterSpacing: 0.4 },
-  lessonLockHint: { fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 4, lineHeight: 15 },
+  lessonTitle: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  lessonSub: { fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 2 },
+  lockHint: { fontSize: 10, fontFamily: "Inter_400Regular", marginTop: 3 },
+  nextPill: { backgroundColor: "#10B98122", paddingHorizontal: 7, paddingVertical: 2, borderRadius: 8 },
+  nextPillText: { fontSize: 9, fontFamily: "Inter_700Bold", color: "#10B981", letterSpacing: 0.5 },
+  donePill: { backgroundColor: "#10B98122", paddingHorizontal: 7, paddingVertical: 2, borderRadius: 8 },
+  donePillText: { fontSize: 9, fontFamily: "Inter_700Bold", color: "#10B981" },
+  playBtn: { width: 30, height: 30, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+
+  /* Stats */
+  activityHint: { flexDirection: "row", alignItems: "center", gap: 8, borderRadius: 12, borderWidth: 1, padding: 12 },
+  activityHintText: { flex: 1, fontSize: 12, fontFamily: "Inter_400Regular" },
+  statsGrid: { flexDirection: "row", gap: 10 },
+  statCard: { flex: 1, alignItems: "center", padding: 14, borderRadius: 18, borderWidth: 1, gap: 8 },
+  statIcon: { width: 36, height: 36, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  statVal: { fontSize: 20, fontFamily: "Inter_700Bold" },
+  statLbl: { fontSize: 10, fontFamily: "Inter_600SemiBold", textAlign: "center" },
 });

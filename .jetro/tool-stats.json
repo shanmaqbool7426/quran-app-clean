@@ -1,0 +1,11 @@
+{
+  "toolCalls": {
+    "jet_render": 1,
+    "jet_doc": 1,
+    "jet_share": 1
+  },
+  "signals": {
+    "docs_published": 1
+  },
+  "lastUpdated": "2026-05-15T17:25:25.898Z"
+}

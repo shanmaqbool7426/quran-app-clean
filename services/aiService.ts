@@ -8,7 +8,7 @@ function getApiBase(): string {
 }
 
 
-const API_BASE = getApiBase();
+export const API_BASE = getApiBase();
 console.log("[aiService] Using API_BASE:", API_BASE);
 
 export interface TafseerResult {

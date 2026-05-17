@@ -46,7 +46,7 @@ interface Props {
 
 type TafseerSource = "ai" | "scholar";
 
-export default function AyahCard({
+export default React.memo(function AyahCard({
   ayah,
   surahId,
   surahName = "Surah",
@@ -265,11 +265,22 @@ export default function AyahCard({
 
         {/* ── Translation ── */}
         {showTranslation && (
-          <View style={[styles.translationWrap, { backgroundColor: isPlaying ? colors.primary + "10" : colors.muted + "40" }]}>
-            <View style={[styles.translationAccent, { backgroundColor: colors.primary }]} />
-            <Text style={[styles.translation, { color: colors.foreground, fontSize: Math.max(14, fontSize - 8) }]}>
-              {ayah.translation}
-            </Text>
+          <View style={{ gap: 8, marginTop: 8 }}>
+            <View style={[styles.translationWrap, { backgroundColor: isPlaying ? colors.primary + "10" : colors.muted + "40", marginTop: 0 }]}>
+              <View style={[styles.translationAccent, { backgroundColor: colors.primary }]} />
+              <Text style={[styles.translation, { color: colors.foreground, fontSize: Math.max(14, fontSize - 8) }]}>
+                {ayah.translation}
+              </Text>
+            </View>
+
+            {ayah.secondaryTranslation && (
+              <View style={[styles.translationWrap, { backgroundColor: isPlaying ? colors.primary + "10" : colors.muted + "20", marginTop: 0 }]}>
+                <View style={[styles.translationAccent, { backgroundColor: "#10B981" }]} />
+                <Text style={[styles.translation, { color: colors.mutedForeground, fontSize: Math.max(14, fontSize - 8) }]}>
+                  {ayah.secondaryTranslation}
+                </Text>
+              </View>
+            )}
           </View>
         )}
       </View>
@@ -464,7 +475,7 @@ export default function AyahCard({
       </Modal>
     </>
   );
-}
+});
 
 const styles = StyleSheet.create({
   container: {

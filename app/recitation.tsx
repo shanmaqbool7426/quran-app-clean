@@ -26,9 +26,10 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { FATIHA_AYAHS, IKHLAS_AYAHS } from "@/constants/quranData";
 import { useApp } from "@/context/AppContext";
 import { useColors } from "@/hooks/useColors";
+import { useQuranSurah } from "@/hooks/useQuranSurah";
+import { useQuranSurahs } from "@/hooks/useQuranSurahs";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -45,18 +46,13 @@ interface WordResult {
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
 // ─────────────────────────────────────────────────────────────────────────────
-const API_BASE = "http://192.168.100.5:8080/api";
+import { API_BASE } from "@/services/aiService";
 
 const COLOR: Record<WordStatus, string> = {
   correct:      "#22C55E",
   intermediate: "#F59E0B",
   wrong:        "#EF4444",
 };
-
-const SURAHS = [
-  { label: "Al-Fatiha", ayahs: FATIHA_AYAHS },
-  { label: "Al-Ikhlas",  ayahs: IKHLAS_AYAHS },
-];
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Arabic helpers (client-side, zero latency)
@@ -112,10 +108,10 @@ function analyseRecitation(expectedArabic: string, transcript: string) {
 export default function RecitationScreen() {
   const colors    = useColors();
   const insets    = useSafeAreaInsets();
-  const { addXP } = useApp();
+  const { addXP, translationLang } = useApp();
 
   const [stage,    setStage]    = useState<Stage>("idle");
-  const [surahIdx, setSurahIdx] = useState(0);
+  const [surahId,  setSurahId]  = useState(1);
   const [ayahIdx,  setAyahIdx]  = useState(0);
   const [score,    setScore]    = useState(0);
   const [words,    setWords]    = useState<WordResult[]>([]);
@@ -127,10 +123,28 @@ export default function RecitationScreen() {
   const waveAnims    = useRef(
     Array.from({ length: 9 }, () => new Animated.Value(0.2))
   ).current;
+  
+  const scrollViewRef = useRef<ScrollView>(null);
 
-  const surah = SURAHS[surahIdx]!;
-  const ayah  = surah.ayahs[ayahIdx]!;
+  const { data: surahsList } = useQuranSurahs();
+  const { data: surahDetail, isLoading: isLoadingSurah } = useQuranSurah(surahId, "ar.alafasy", translationLang);
+
+  const arabicAyahs = surahDetail?.arabicAyahs ?? [];
+  const translationAyahs = surahDetail?.translationAyahs ?? [];
+  const ayah = arabicAyahs[ayahIdx];
+  const translationText = translationAyahs[ayahIdx]?.text ?? "";
+
   const topPad = Platform.OS === "web" ? 67 : insets.top;
+
+  // Scroll to selected surah tab automatically
+  useEffect(() => {
+    if (surahsList && scrollViewRef.current) {
+      const idx = surahsList.findIndex(s => s.number === surahId);
+      if (idx !== -1) {
+        scrollViewRef.current.scrollTo({ x: Math.max(0, idx * 100 - 150), animated: true });
+      }
+    }
+  }, [surahId, surahsList]);
 
   // ── Animations ─────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -157,14 +171,15 @@ export default function RecitationScreen() {
 
   function nextAyah() {
     const next = ayahIdx + 1;
-    if (next < surah.ayahs.length) setAyahIdx(next);
-    else { setSurahIdx((surahIdx + 1) % SURAHS.length); setAyahIdx(0); }
+    if (next < arabicAyahs.length) setAyahIdx(next);
+    else if (surahId < 114) { setSurahId(surahId + 1); setAyahIdx(0); }
     reset();
   }
 
   // ── Finish scoring ─────────────────────────────────────────────────────────
   function finish(transcript: string) {
-    const { score: s, words: w } = analyseRecitation(ayah.arabic, transcript);
+    if (!ayah?.text) return;
+    const { score: s, words: w } = analyseRecitation(ayah.text, transcript);
     setScore(s); setWords(w); setStage("result");
     if (s >= 85) addXP(20); else if (s >= 60) addXP(10); else addXP(3);
     Haptics.notificationAsync(
@@ -203,7 +218,7 @@ export default function RecitationScreen() {
   // ── Record stop + backend STT ──────────────────────────────────────────────
   async function stopAndAnalyse() {
     const rec = recordingRef.current;
-    if (!rec) return;
+    if (!rec || !ayah?.text) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     setStage("processing");
 
@@ -220,11 +235,17 @@ export default function RecitationScreen() {
       const ext      = uri.endsWith(".wav") ? "wav" : "m4a";
       const mimeType = ext === "wav" ? "audio/wav" : "audio/m4a";
 
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
       const res = await fetch(`${API_BASE}/ai/recitation`, {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ audioBase64: base64, mimeType, expectedArabic: ayah.arabic }),
+        body:    JSON.stringify({ audioBase64: base64, mimeType, expectedArabic: ayah.text }),
+        signal: controller.signal,
       });
+      
+      clearTimeout(timeoutId);
 
       if (!res.ok) throw new Error(`Server error ${res.status}`);
       const data = await res.json() as { score: number; transcript: string; feedback: WordResult[] };
@@ -241,8 +262,9 @@ export default function RecitationScreen() {
     } catch (e) {
       // Backend STT failed — offer manual input as fallback
       recordingRef.current = null;
+      const errorDetail = e instanceof Error ? e.message : "Unknown error";
       setErrorMsg(
-        "Voice recognition unavailable. Enter what you recited to get feedback:"
+        `Voice recognition unavailable (${errorDetail}). Enter what you recited to get feedback:`
       );
       setStage("manual");
     }
@@ -253,7 +275,7 @@ export default function RecitationScreen() {
     else if (stage === "recording") stopAndAnalyse();
   };
 
-  const scoreColor = score >= 85 ? COLOR.correct : score >= 60 ? COLOR.intermediate : COLOR.wrong;
+  const scoreColor   = score >= 85 ? COLOR.correct : score >= 60 ? COLOR.intermediate : COLOR.wrong;
   const correctCount = words.filter(w => w.status === "correct").length;
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -272,198 +294,213 @@ export default function RecitationScreen() {
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={{ flexGrow: 1 }} showsVerticalScrollIndicator={false} stickyHeaderIndices={[0]}>
 
         {/* ── Surah tabs ── */}
-        <View style={s.tabRow}>
-          {SURAHS.map((su, i) => (
-            <TouchableOpacity
-              key={i}
-              style={[s.tab, {
-                backgroundColor: surahIdx === i ? colors.primary : colors.muted,
-                borderColor:     surahIdx === i ? colors.primary : colors.border,
-              }]}
-              onPress={() => { setSurahIdx(i); setAyahIdx(0); reset(); }}
-            >
-              <Text style={[s.tabText, { color: surahIdx === i ? "#fff" : colors.mutedForeground }]}>
-                {su.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
+        <View style={{ backgroundColor: colors.background, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+          <ScrollView ref={scrollViewRef} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.tabRow}>
+            {(surahsList || []).map((su) => (
+              <TouchableOpacity
+                key={su.number}
+                style={[s.tab, {
+                  backgroundColor: surahId === su.number ? colors.primary : colors.card,
+                  borderColor:     surahId === su.number ? colors.primary : colors.border,
+                }]}
+                onPress={() => { setSurahId(su.number); setAyahIdx(0); reset(); }}
+              >
+                <Text style={[s.tabText, { color: surahId === su.number ? "#fff" : colors.mutedForeground }]}>
+                  {su.number}. {su.englishName}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
         </View>
 
-        {/* ── Ayah dots ── */}
-        <View style={s.dotRow}>
-          {surah.ayahs.map((_, i) => (
-            <TouchableOpacity key={i} onPress={() => { setAyahIdx(i); reset(); }}>
-              <View style={[s.dot, {
-                width:           i === ayahIdx ? 24 : 8,
-                backgroundColor: i === ayahIdx ? colors.primary : colors.border,
-              }]} />
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* ── Ayah card ── */}
-        <View style={[s.ayahCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[s.ayahMeta, { color: colors.mutedForeground }]}>
-            {surah.label} · Ayah {ayahIdx + 1}/{surah.ayahs.length}
-          </Text>
-          <Text style={[s.arabic, { color: colors.foreground }]}>{ayah.arabic}</Text>
-          <Text style={[s.translit, { color: colors.primary }]}>{ayah.transliteration}</Text>
-          <View style={[s.translationRow, { borderLeftColor: colors.primary, backgroundColor: colors.muted + "50" }]}>
-            <Text style={[s.translation, { color: colors.foreground }]}>{ayah.translation}</Text>
+        {isLoadingSurah ? (
+          <View style={{ flex: 1, alignItems: "center", justifyContent: "center", minHeight: 200 }}>
+             <ActivityIndicator size="large" color={colors.primary} />
           </View>
-        </View>
-
-        {/* ── Manual input mode ── */}
-        {stage === "manual" && (
-          <View style={[s.manualCard, { backgroundColor: colors.card, borderColor: "#F59E0B50" }]}>
-            <View style={s.manualHeader}>
-              <Feather name="edit-3" size={16} color="#F59E0B" />
-              <Text style={[s.manualTitle, { color: colors.foreground }]}>Manual Input</Text>
-            </View>
-            <Text style={[s.manualSub, { color: colors.mutedForeground }]}>{errorMsg}</Text>
-            <TextInput
-              style={[s.manualInput, { backgroundColor: colors.background, borderColor: colors.border, color: colors.foreground }]}
-              value={manual}
-              onChangeText={setManual}
-              placeholder="Type the Arabic you recited..."
-              placeholderTextColor={colors.mutedForeground}
-              multiline
-              textAlign="right"
-              autoCorrect={false}
-            />
-            <TouchableOpacity
-              style={[s.submitBtn, { backgroundColor: colors.primary, opacity: manual.trim() ? 1 : 0.4 }]}
-              onPress={submitManual}
-              disabled={!manual.trim()}
-            >
-              <Text style={s.submitBtnText}>Check My Recitation</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={reset} style={s.skipBtn}>
-              <Text style={[s.skipText, { color: colors.mutedForeground }]}>Try recording again</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* ── Result card ── */}
-        {stage === "result" && (
-          <View style={[s.resultCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-
-            {/* Score row */}
-            <View style={s.scoreRow}>
-              <View style={[s.scoreCircle, { borderColor: scoreColor }]}>
-                <Text style={[s.scoreNum, { color: scoreColor }]}>{score}</Text>
-                <Text style={[s.scoreSub, { color: colors.mutedForeground }]}>/100</Text>
+        ) : (
+          <>
+            {/* ── Ayah dots ── */}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.dotRowContainer}>
+              <View style={s.dotRow}>
+                {arabicAyahs.map((_, i) => (
+                  <TouchableOpacity key={i} onPress={() => { setAyahIdx(i); reset(); }}>
+                    <View style={[s.dot, {
+                      width:           i === ayahIdx ? 24 : 8,
+                      backgroundColor: i === ayahIdx ? colors.primary : colors.border,
+                    }]} />
+                  </TouchableOpacity>
+                ))}
               </View>
-              <View style={{ flex: 1, gap: 5 }}>
-                <Text style={[s.scoreLabel, { color: colors.foreground }]}>
-                  {score >= 85 ? "Excellent! 🌟" : score >= 60 ? "Good effort! 👍" : "Keep practicing 💪"}
+            </ScrollView>
+
+            {/* ── Ayah card ── */}
+            {ayah && (
+              <View style={[s.ayahCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <Text style={[s.ayahMeta, { color: colors.mutedForeground }]}>
+                  {surahDetail?.surah.englishName} · Ayah {ayahIdx + 1}/{arabicAyahs.length}
                 </Text>
-                <Text style={[s.scoreDesc, { color: colors.mutedForeground }]}>
-                  {correctCount}/{words.length} words correct
-                </Text>
-                {/* Progress bar */}
-                <View style={[s.bar, { backgroundColor: colors.border }]}>
-                  <View style={[s.barFill, { width: `${score}%` as any, backgroundColor: scoreColor }]} />
+                <Text style={[s.arabic, { color: colors.foreground }]}>{ayah.text}</Text>
+                <View style={[s.translationRow, { borderLeftColor: colors.primary, backgroundColor: colors.muted + "50" }]}>
+                  <Text style={[s.translation, { color: colors.foreground }]}>{translationText}</Text>
                 </View>
               </View>
-            </View>
+            )}
 
-            {/* Word chips */}
-            {words.length > 0 && (
-              <>
-                <Text style={[s.chipLabel, { color: colors.mutedForeground }]}>WORD BY WORD</Text>
-                <View style={s.chipRow}>
-                  {words.map((w, i) => (
-                    <View key={i} style={[s.chip, {
-                      backgroundColor: COLOR[w.status] + "15",
-                      borderColor:     COLOR[w.status] + "50",
-                    }]}>
-                      <Text style={[s.chipArabic, { color: COLOR[w.status] }]}>{w.word}</Text>
-                      <Text style={[s.chipStatus, { color: COLOR[w.status] }]}>
-                        {w.status === "correct" ? "✓ Correct" : w.status === "intermediate" ? "~ Close" : "✗ Wrong"}
-                      </Text>
-                      {w.status !== "correct" && w.heard ? (
-                        <Text style={[s.chipHeard, { color: colors.mutedForeground }]} numberOfLines={1}>
-                          heard: {w.heard}
-                        </Text>
-                      ) : null}
+            {/* ── Manual input mode ── */}
+            {stage === "manual" && (
+              <View style={[s.manualCard, { backgroundColor: colors.card, borderColor: "#F59E0B50" }]}>
+                <View style={s.manualHeader}>
+                  <Feather name="edit-3" size={16} color="#F59E0B" />
+                  <Text style={[s.manualTitle, { color: colors.foreground }]}>Manual Input</Text>
+                </View>
+                <Text style={[s.manualSub, { color: colors.mutedForeground }]}>{errorMsg}</Text>
+                <TextInput
+                  style={[s.manualInput, { backgroundColor: colors.background, borderColor: colors.border, color: colors.foreground }]}
+                  value={manual}
+                  onChangeText={setManual}
+                  placeholder="Type the Arabic you recited..."
+                  placeholderTextColor={colors.mutedForeground}
+                  multiline
+                  textAlign="right"
+                  autoCorrect={false}
+                />
+                <TouchableOpacity
+                  style={[s.submitBtn, { backgroundColor: colors.primary, opacity: manual.trim() ? 1 : 0.4 }]}
+                  onPress={submitManual}
+                  disabled={!manual.trim()}
+                >
+                  <Text style={s.submitBtnText}>Check My Recitation</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={reset} style={s.skipBtn}>
+                  <Text style={[s.skipText, { color: colors.mutedForeground }]}>Try recording again</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* ── Result card ── */}
+            {stage === "result" && (
+              <View style={[s.resultCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+
+                {/* Score row */}
+                <View style={s.scoreRow}>
+                  <View style={[s.scoreCircle, { borderColor: scoreColor }]}>
+                    <Text style={[s.scoreNum, { color: scoreColor }]}>{score}</Text>
+                    <Text style={[s.scoreSub, { color: colors.mutedForeground }]}>/100</Text>
+                  </View>
+                  <View style={{ flex: 1, gap: 5 }}>
+                    <Text style={[s.scoreLabel, { color: colors.foreground }]}>
+                      {score >= 85 ? "Excellent! 🌟" : score >= 60 ? "Good effort! 👍" : "Keep practicing 💪"}
+                    </Text>
+                    <Text style={[s.scoreDesc, { color: colors.mutedForeground }]}>
+                      {correctCount}/{words.length} words correct
+                    </Text>
+                    {/* Progress bar */}
+                    <View style={[s.bar, { backgroundColor: colors.border }]}>
+                      <View style={[s.barFill, { width: `${score}%` as any, backgroundColor: scoreColor }]} />
                     </View>
+                  </View>
+                </View>
+
+                {/* Word chips */}
+                {words.length > 0 && (
+                  <>
+                    <Text style={[s.chipLabel, { color: colors.mutedForeground }]}>WORD BY WORD</Text>
+                    <View style={s.chipRow}>
+                      {words.map((w, i) => (
+                        <View key={i} style={[s.chip, {
+                          backgroundColor: COLOR[w.status] + "15",
+                          borderColor:     COLOR[w.status] + "50",
+                        }]}>
+                          <Text style={[s.chipArabic, { color: COLOR[w.status] }]}>{w.word}</Text>
+                          <Text style={[s.chipStatus, { color: COLOR[w.status] }]}>
+                            {w.status === "correct" ? "✓ Correct" : w.status === "intermediate" ? "~ Close" : "✗ Wrong"}
+                          </Text>
+                          {w.status !== "correct" && w.heard ? (
+                            <Text style={[s.chipHeard, { color: colors.mutedForeground }]} numberOfLines={1}>
+                              heard: {w.heard}
+                            </Text>
+                          ) : null}
+                        </View>
+                      ))}
+                    </View>
+                  </>
+                )}
+              </View>
+            )}
+
+            {/* ── Recorder ── */}
+            {ayah && (
+              <View style={s.recorderSection}>
+                {/* Waveform */}
+                <View style={s.waveform}>
+                  {waveAnims.map((anim, i) => (
+                    <Animated.View key={i} style={[s.wavebar, {
+                      backgroundColor: stage === "recording" ? "#8B5CF6" : colors.border,
+                      transform:       [{ scaleY: anim }],
+                      opacity:         stage === "recording" ? 1 : 0.3,
+                    }]} />
                   ))}
                 </View>
-              </>
+
+                {/* Mic / Processing button */}
+                <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+                  <TouchableOpacity
+                    onPress={handleMic}
+                    activeOpacity={0.85}
+                    disabled={stage === "processing" || stage === "manual"}
+                  >
+                    {stage === "processing" ? (
+                      <LinearGradient colors={["#6B7280", "#4B5563"]} style={s.micBtn}>
+                        <ActivityIndicator color="#FFFFFF" size="large" />
+                      </LinearGradient>
+                    ) : stage === "recording" ? (
+                      <LinearGradient colors={["#EF4444", "#DC2626"]} style={s.micBtn}>
+                        <Feather name="square" size={32} color="#FFFFFF" />
+                      </LinearGradient>
+                    ) : (
+                      <LinearGradient colors={["#8B5CF6", "#6D28D9"]} style={s.micBtn}>
+                        <Feather name="mic" size={36} color="#FFFFFF" />
+                      </LinearGradient>
+                    )}
+                  </TouchableOpacity>
+                </Animated.View>
+
+                <Text style={[s.hint, { color: colors.mutedForeground }]}>
+                  {stage === "idle"       ? "Tap mic and recite the ayah above"  :
+                   stage === "recording"  ? "🎙 Listening... tap ■ when done"    :
+                   stage === "processing" ? "⏳ Analysing with AI..."             :
+                   stage === "manual"     ? "Enter your recitation above ↑"       : ""}
+                </Text>
+
+                {/* Action buttons */}
+                {stage === "result" && (
+                  <View style={s.actionRow}>
+                    <TouchableOpacity style={[s.actionBtn, { backgroundColor: colors.muted }]} onPress={reset}>
+                      <Feather name="refresh-cw" size={15} color={colors.foreground} />
+                      <Text style={[s.actionText, { color: colors.foreground }]}>Retry</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[s.actionBtn, { backgroundColor: colors.primary }]} onPress={nextAyah}>
+                      <Text style={[s.actionText, { color: "#fff" }]}>Next Ayah</Text>
+                      <Feather name="arrow-right" size={15} color="#fff" />
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
             )}
-          </View>
-        )}
 
-        {/* ── Recorder ── */}
-        <View style={s.recorderSection}>
-          {/* Waveform */}
-          <View style={s.waveform}>
-            {waveAnims.map((anim, i) => (
-              <Animated.View key={i} style={[s.wavebar, {
-                backgroundColor: stage === "recording" ? "#8B5CF6" : colors.border,
-                transform:       [{ scaleY: anim }],
-                opacity:         stage === "recording" ? 1 : 0.3,
-              }]} />
-            ))}
-          </View>
-
-          {/* Mic / Processing button */}
-          <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
-            <TouchableOpacity
-              onPress={handleMic}
-              activeOpacity={0.85}
-              disabled={stage === "processing" || stage === "manual"}
-            >
-              {stage === "processing" ? (
-                <LinearGradient colors={["#6B7280", "#4B5563"]} style={s.micBtn}>
-                  <ActivityIndicator color="#FFFFFF" size="large" />
-                </LinearGradient>
-              ) : stage === "recording" ? (
-                <LinearGradient colors={["#EF4444", "#DC2626"]} style={s.micBtn}>
-                  <Feather name="square" size={32} color="#FFFFFF" />
-                </LinearGradient>
-              ) : (
-                <LinearGradient colors={["#8B5CF6", "#6D28D9"]} style={s.micBtn}>
-                  <Feather name="mic" size={36} color="#FFFFFF" />
-                </LinearGradient>
-              )}
-            </TouchableOpacity>
-          </Animated.View>
-
-          <Text style={[s.hint, { color: colors.mutedForeground }]}>
-            {stage === "idle"       ? "Tap mic and recite the ayah above"  :
-             stage === "recording"  ? "🎙 Listening... tap ■ when done"    :
-             stage === "processing" ? "⏳ Analysing with AI..."             :
-             stage === "manual"     ? "Enter your recitation above ↑"       : ""}
-          </Text>
-
-          {/* Action buttons */}
-          {stage === "result" && (
-            <View style={s.actionRow}>
-              <TouchableOpacity style={[s.actionBtn, { backgroundColor: colors.muted }]} onPress={reset}>
-                <Feather name="refresh-cw" size={15} color={colors.foreground} />
-                <Text style={[s.actionText, { color: colors.foreground }]}>Retry</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[s.actionBtn, { backgroundColor: colors.primary }]} onPress={nextAyah}>
-                <Text style={[s.actionText, { color: "#fff" }]}>Next Ayah</Text>
-                <Feather name="arrow-right" size={15} color="#fff" />
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
-
-        {/* ── Tips ── */}
-        {stage === "idle" && (
-          <View style={[s.tip, { backgroundColor: colors.secondary, marginHorizontal: 16, marginBottom: 28 }]}>
-            <Feather name="info" size={14} color={colors.primary} />
-            <Text style={[s.tipText, { color: colors.foreground }]}>
-              Speak clearly in Arabic. Each word is scored individually — you cannot fake your score.
-            </Text>
-          </View>
+            {/* ── Tips ── */}
+            {stage === "idle" && ayah && (
+              <View style={[s.tip, { backgroundColor: colors.secondary, marginHorizontal: 16, marginBottom: 28 }]}>
+                <Feather name="info" size={14} color={colors.primary} />
+                <Text style={[s.tipText, { color: colors.foreground }]}>
+                  Speak clearly in Arabic. Each word is scored individually — you cannot fake your score.
+                </Text>
+              </View>
+            )}
+          </>
         )}
 
       </ScrollView>
@@ -482,11 +519,12 @@ const s = StyleSheet.create({
   pill:     { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
   pillText: { fontSize: 11, fontFamily: "Inter_700Bold" },
 
-  tabRow:   { flexDirection: "row", justifyContent: "center", gap: 10, marginTop: 16, paddingHorizontal: 16 },
+  tabRow:   { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 16 },
   tab:      { paddingHorizontal: 20, paddingVertical: 9, borderRadius: 24, borderWidth: 1 },
   tabText:  { fontSize: 13, fontFamily: "Inter_600SemiBold" },
 
-  dotRow:   { flexDirection: "row", justifyContent: "center", gap: 6, marginTop: 10 },
+  dotRowContainer: { paddingHorizontal: 16, marginTop: 16, marginBottom: 10 },
+  dotRow:   { flexDirection: "row", gap: 6 },
   dot:      { height: 8, borderRadius: 4 },
 
   ayahCard:      { margin: 16, padding: 18, borderRadius: 18, borderWidth: 1, gap: 10 },
